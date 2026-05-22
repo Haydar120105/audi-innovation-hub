@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Audi Innovation Hub"
+version = "1.0.0"
+id = "artifacts/audi-innovation-hub"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25655
+
+[services.development]
+run = "pnpm --filter @workspace/audi-innovation-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/audi-innovation-hub", "run", "build" ]
+publicDir = "artifacts/audi-innovation-hub/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25655"
+BASE_PATH = "/"
