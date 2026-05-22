@@ -445,17 +445,15 @@ export default function PlantScene() {
 
       {/* Audi logo */}
       <div className="absolute top-7 left-7 z-20">
-        <motion.svg width="122" height="40" viewBox="-2 2 122 36" initial="hidden" animate="visible">
-          {[16, 42, 68, 94].map((cx, i) => (
-            <motion.circle key={i} cx={cx} cy={20} r={15}
-              fill="none" stroke="rgba(255,255,255,0.92)" strokeWidth="2.5"
-              variants={{
-                hidden: { pathLength: 0, opacity: 0 },
-                visible: { pathLength: 1, opacity: 1, transition: { duration: 1.3, delay: i * 0.14, ease: "easeInOut" } }
-              }}
-            />
-          ))}
-        </motion.svg>
+        <motion.img
+          src="/audi-logo.png"
+          alt="Audi"
+          width={110}
+          style={{ opacity: 0.92 }}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 0.92, y: 0 }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+        />
       </div>
 
       {/* Hero headline */}
@@ -682,7 +680,7 @@ export default function PlantScene() {
         <Person x={-0.2} y={1.0} duration={6.5} delay={3} />
 
         {/* Department popup — inside SVG so it scales/positions with the scene */}
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {selected && (() => {
             const CARD_W = 248;
             const CARD_H = 290;

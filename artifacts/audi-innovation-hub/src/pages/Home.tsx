@@ -8,8 +8,8 @@ export default function Home() {
       <div className="w-full" style={{ height: "100svh" }}>
         <PlantScene />
       </div>
-      <Benefits />
       <FocusAreas />
+      <Benefits />
     </div>
   );
 }
