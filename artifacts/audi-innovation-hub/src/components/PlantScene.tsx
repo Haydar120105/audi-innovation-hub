@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 
 const W = 1000;
@@ -340,8 +341,8 @@ const DEPARTMENTS: Department[] = [
 
 // ── Floating popup card — rendered inside SVG as foreignObject ──
 // cardX/cardY are SVG viewBox coordinates supplied by the parent
-function DeptCard({ dept, cardX, cardY, cardW, onClose }: {
-  dept: Department; cardX: number; cardY: number; cardW: number; onClose: () => void;
+function DeptCard({ dept, cardX, cardY, cardW, onClose, onApply }: {
+  dept: Department; cardX: number; cardY: number; cardW: number; onClose: () => void; onApply: () => void;
 }) {
   return (
     <foreignObject
@@ -403,17 +404,16 @@ function DeptCard({ dept, cardX, cardY, cardW, onClose }: {
             </div>
 
             {/* CTA */}
-            <a
-              href={`mailto:startup@audi.de?subject=Application – ${dept.label}&body=Department: ${dept.label}%0A%0AFocus: ${dept.focus.join(", ")}%0A%0ADescribe your startup:`}
+            <button
               data-testid={`apply-dept-${dept.id}`}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onApply(); }}
               style={{
-                display: "block", textAlign: "center", padding: "9px 0",
+                display: "block", width: "100%", textAlign: "center", padding: "9px 0",
                 borderRadius: 3, fontSize: 11, fontWeight: 700,
                 letterSpacing: "0.08em", color: "#fff", background: dept.color,
-                textDecoration: "none",
+                border: "none", cursor: "pointer",
               }}
-            >Apply to {dept.label} →</a>
+            >Apply to {dept.label} →</button>
           </div>
         </div>
       </motion.div>
@@ -424,6 +424,7 @@ function DeptCard({ dept, cardX, cardY, cardW, onClose }: {
 // ── Main scene ───────────────────────────────────────────────────
 export default function PlantScene() {
   const [activeDept, setActiveDept] = useState<string | null>(null);
+  const [, navigate] = useLocation();
   const selected = DEPARTMENTS.find(d => d.id === activeDept) ?? null;
 
   // All paths are closed loops — last point == first point
@@ -699,6 +700,7 @@ export default function PlantScene() {
                 dept={selected}
                 cardX={cardX} cardY={cardY} cardW={CARD_W}
                 onClose={() => setActiveDept(null)}
+                onApply={() => navigate("/apply")}
               />
             );
           })()}

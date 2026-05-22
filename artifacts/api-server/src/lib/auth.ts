@@ -70,3 +70,36 @@ export function isAudiStaff(req: Request): boolean {
     return false;
   }
 }
+
+/** Require superuser role. Returns 403 if not. */
+export async function requireSuperuser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (!CLERK_ENABLED) { next(); return; }
+  const { getAuth } = await import("@clerk/express");
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+  const meta = auth.sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
+  if (meta?.["role"] !== "superuser") {
+    res.status(403).json({ error: "Access restricted to superusers." });
+    return;
+  }
+  next();
+}
+
+/** Returns true if the authenticated user has the superuser role. */
+export function isSuperuser(req: Request): boolean {
+  if (!CLERK_ENABLED) return false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getAuth } = require("@clerk/express") as typeof import("@clerk/express");
+    const auth = getAuth(req);
+    const meta = auth.sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
+    return meta?.["role"] === "superuser";
+  } catch {
+    return false;
+  }
+}
+
+export { CLERK_ENABLED };

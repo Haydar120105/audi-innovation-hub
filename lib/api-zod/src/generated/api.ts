@@ -98,9 +98,35 @@ export const UpdateApplicationParams = zod.object({
   "id": zod.coerce.string()
 })
 
+const RequirementItem = zod.object({
+  id: zod.string(),
+  text: zod.string(),
+  done: zod.boolean(),
+});
+
+const MilestoneItem = zod.object({
+  id: zod.string(),
+  title: zod.string(),
+  dueDate: zod.string().optional(),
+  status: zod.enum(['pending', 'in_progress', 'done']),
+});
+
+const KpiItem = zod.object({
+  id: zod.string(),
+  metric: zod.string(),
+  target: zod.string(),
+  current: zod.string(),
+  unit: zod.string().optional(),
+});
+
 export const UpdateApplicationBody = zod.object({
   "status": zod.enum(['pending', 'routed', 'shortlisted', 'accepted', 'declined', 'archived']).optional(),
-  "notes": zod.string().optional()
+  "notes": zod.string().optional(),
+  "rating": zod.number().int().min(1).max(5).nullable().optional(),
+  "nextStep": zod.string().optional(),
+  "requirements": zod.array(RequirementItem).optional(),
+  "milestones": zod.array(MilestoneItem).optional(),
+  "kpis": zod.array(KpiItem).optional(),
 })
 
 export const UpdateApplicationResponse = zod.object({

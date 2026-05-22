@@ -172,7 +172,7 @@ export default function Benefits() {
               <motion.p {...up(0.18)}
                 className="text-white/50 text-base leading-relaxed mb-8"
               >
-                Send everything below in a single email and our team will be in touch within two weeks.
+                Start your application in minutes — our AI-guided chat walks you through everything step by step.
               </motion.p>
 
               <motion.div {...up(0.24)}>

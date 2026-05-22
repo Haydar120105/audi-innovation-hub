@@ -5,6 +5,7 @@ import {
   timestamp,
   jsonb,
   pgEnum,
+  integer,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -36,6 +37,12 @@ export const applicationsTable = pgTable("applications", {
   trackingToken: text("tracking_token").notNull().unique().default(sql`gen_random_uuid()::text`),
   notes: text("notes"),
   clerkUserId: text("clerk_user_id"),
+  // Staff assessment fields
+  rating: integer("rating"),          // 1–5 stars
+  nextStep: text("next_step"),        // free-text next action
+  requirements: jsonb("requirements"), // [{id,text,done}]
+  milestones: jsonb("milestones"),    // [{id,title,dueDate,status}]
+  kpis: jsonb("kpis"),               // [{id,metric,target,current,unit}]
 });
 
 export const insertApplicationSchema = createInsertSchema(applicationsTable).omit({

@@ -47,9 +47,35 @@ export const ApplicationUpdateInputStatus = {
   archived: 'archived',
 } as const;
 
+export interface RequirementItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface MilestoneItem {
+  id: string;
+  title: string;
+  dueDate?: string;
+  status: 'pending' | 'in_progress' | 'done';
+}
+
+export interface KpiItem {
+  id: string;
+  metric: string;
+  target: string;
+  current: string;
+  unit?: string;
+}
+
 export interface ApplicationUpdateInput {
   status?: ApplicationUpdateInputStatus;
   notes?: string;
+  rating?: number | null;
+  nextStep?: string;
+  requirements?: RequirementItem[];
+  milestones?: MilestoneItem[];
+  kpis?: KpiItem[];
 }
 
 export interface ApplicationSummary {
@@ -81,6 +107,11 @@ export interface Application {
   departmentScores?: DepartmentScore[];
   businessCases?: BusinessCase[];
   notes?: string;
+  rating?: number | null;
+  nextStep?: string | null;
+  requirements?: RequirementItem[] | null;
+  milestones?: MilestoneItem[] | null;
+  kpis?: KpiItem[] | null;
 }
 
 export interface ApplicationTracking {
