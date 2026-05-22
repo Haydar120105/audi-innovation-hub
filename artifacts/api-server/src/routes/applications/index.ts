@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, applicationsTable } from "@workspace/db";
 import {
@@ -9,10 +9,12 @@ import {
   UpdateApplicationBody,
 } from "@workspace/api-zod";
 import { analyzeApplication } from "./analyze";
+import { requireAuth, requireAudiStaff, getUserId, isAudiStaff } from "../../lib/auth";
 
 const router: IRouter = Router();
 
-router.post("/applications", async (req, res): Promise<void> => {
+// POST /applications — requires sign-in; stores clerkUserId
+router.post("/applications", requireAuth, async (req, res): Promise<void> => {
   const parsed = SubmitApplicationBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -20,6 +22,7 @@ router.post("/applications", async (req, res): Promise<void> => {
   }
 
   const { companyName, website, stage, teamSize, transcript } = parsed.data;
+  const clerkUserId = getUserId(req);
 
   const [app] = await db
     .insert(applicationsTable)
@@ -31,6 +34,7 @@ router.post("/applications", async (req, res): Promise<void> => {
       transcript: transcript as unknown as Record<string, unknown>[],
       status: "pending",
       trackingToken: randomUUID(),
+      clerkUserId,
     })
     .returning();
 
@@ -61,15 +65,28 @@ router.post("/applications", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/applications", async (req, res): Promise<void> => {
+// GET /applications — audi_staff sees all; applicants see only their own
+router.get("/applications", requireAuth, async (req, res): Promise<void> => {
+  if (isAudiStaff(req)) {
+    const apps = await db
+      .select()
+      .from(applicationsTable)
+      .orderBy(desc(applicationsTable.createdAt));
+    res.json(apps);
+    return;
+  }
+
+  // Applicant: only their own submissions
+  const userId = getUserId(req)!;
   const apps = await db
     .select()
     .from(applicationsTable)
+    .where(eq(applicationsTable.clerkUserId, userId))
     .orderBy(desc(applicationsTable.createdAt));
-
   res.json(apps);
 });
 
+// GET /applications/track/:token — public
 router.get("/applications/track/:token", async (req, res): Promise<void> => {
   const params = TrackApplicationParams.safeParse(req.params);
   if (!params.success) {
@@ -95,7 +112,8 @@ router.get("/applications/track/:token", async (req, res): Promise<void> => {
   });
 });
 
-router.get("/applications/:id", async (req, res): Promise<void> => {
+// GET /applications/:id — audi_staff or owner
+router.get("/applications/:id", requireAuth, async (req, res): Promise<void> => {
   const params = GetApplicationParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -112,22 +130,17 @@ router.get("/applications/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  // Non-staff can only see their own application
+  if (!isAudiStaff(req) && app.clerkUserId !== getUserId(req)) {
+    res.status(403).json({ error: "Access denied." });
+    return;
+  }
+
   res.json(app);
 });
 
-router.patch("/applications/:id", async (req, res): Promise<void> => {
-  const secret = process.env["DEPARTMENT_WRITE_SECRET"];
-  if (!secret) {
-    res.status(503).json({ error: "Department write access is not configured on this server." });
-    return;
-  }
-  const authHeader = req.headers["authorization"];
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!token || token !== secret) {
-    res.status(401).json({ error: "Unauthorized. A valid department key is required." });
-    return;
-  }
-
+// PATCH /applications/:id — audi_staff only (replaces DEPARTMENT_WRITE_SECRET)
+router.patch("/applications/:id", requireAudiStaff, async (req, res): Promise<void> => {
   const params = GetApplicationParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

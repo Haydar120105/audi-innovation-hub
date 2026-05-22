@@ -35,6 +35,7 @@ export const applicationsTable = pgTable("applications", {
   businessCases: jsonb("business_cases"),
   trackingToken: text("tracking_token").notNull().unique().default(sql`gen_random_uuid()::text`),
   notes: text("notes"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 export const insertApplicationSchema = createInsertSchema(applicationsTable).omit({

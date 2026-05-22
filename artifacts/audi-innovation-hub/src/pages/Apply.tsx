@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
+import { useAuth, UserButton } from "@clerk/clerk-react";
 import { useSubmitApplication } from "@workspace/api-client-react";
 import type { Application } from "@workspace/api-client-react";
 
@@ -259,6 +260,7 @@ export default function Apply() {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { getToken } = useAuth();
   const { mutateAsync: submitApp } = useSubmitApplication();
 
   const allRequiredFilled = REQUIRED_FIELDS.every((f) => collectedFields[f]);
@@ -296,9 +298,13 @@ export default function Apply() {
       setIsLoading(true);
 
       try {
+        const token = await getToken();
         const res = await fetch("/api/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
             collectedFields,
@@ -341,10 +347,15 @@ export default function Apply() {
       setIsPdfLoading(true);
 
       try {
+        const token = await getToken();
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch("/api/extract-pdf", { method: "POST", body: formData });
+        const res = await fetch("/api/extract-pdf", {
+          method: "POST",
+          body: formData,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (!res.ok) throw new Error("PDF extraction failed");
 
         const data = (await res.json()) as {
@@ -477,7 +488,16 @@ export default function Apply() {
             </span>
           </span>
         </Link>
-        <FieldProgress fields={REQUIRED_FIELDS} collected={collectedFields} />
+        <div className="flex items-center gap-4">
+          <FieldProgress fields={REQUIRED_FIELDS} collected={collectedFields} />
+          <UserButton
+            appearance={{
+              elements: {
+                avatarBox: "w-8 h-8",
+              },
+            }}
+          />
+        </div>
       </div>
 
       {/* Chat */}

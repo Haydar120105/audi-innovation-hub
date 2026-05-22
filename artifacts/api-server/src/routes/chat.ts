@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { requireAuth } from "../lib/auth";
 
 const router = Router();
 
@@ -99,7 +100,7 @@ const SAVE_TOOL = {
   },
 };
 
-router.post("/chat", async (req, res): Promise<void> => {
+router.post("/chat", requireAuth, async (req, res): Promise<void> => {
   const { messages, collectedFields = {} } = req.body as {
     messages: Array<{ role: string; content: string }>;
     collectedFields: Record<string, unknown>;

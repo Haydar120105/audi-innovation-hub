@@ -58,17 +58,27 @@ pnpm --filter @workspace/db run push           # DB-Schema pushen
 
 ---
 
-## Umgebungsvariablen (artifacts/api-server/.env)
+## Umgebungsvariablen
 
+### Backend (artifacts/api-server/.env)
 ```env
 PORT=8000
 NODE_ENV=development
 DATABASE_URL=postgresql://...      # Neon oder beliebige Postgres-Instanz
 ANTHROPIC_API_KEY=sk-ant-...       # Claude API Key (Pflicht)
-DEPARTMENT_WRITE_SECRET=...        # Bearer Token für Abteilungs-Schreibzugriff
+DEPARTMENT_WRITE_SECRET=...        # Legacy Bearer Token (nicht mehr primär genutzt)
+CLERK_PUBLISHABLE_KEY=pk_test_...  # Clerk — aus dashboard.clerk.com
+CLERK_SECRET_KEY=sk_test_...       # Clerk — aus dashboard.clerk.com
 ```
 
-**Sicherheit:** `.env` ist in `.gitignore` und wird nie committed. Template liegt unter `artifacts/api-server/.env.example`. API-Keys regelmäßig rotieren (Anthropic Console + Neon Dashboard).
+### Frontend (artifacts/audi-innovation-hub/.env.local)
+```env
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...  # Gleicher Key wie im Backend
+```
+
+**Sicherheit:** Alle `.env`-Dateien sind in `.gitignore`. Templates unter `*.env.example`. API-Keys regelmäßig rotieren.
+
+**Dev ohne Clerk-Keys:** Wenn `CLERK_*`-Keys fehlen oder `REPLACE_ME` enthalten, loggt das Backend eine Warnung und deaktiviert Auth transparent. Alle Routen sind dann offen — nur für lokale Entwicklung!
 
 Das dev-Script lädt `.env` explizit per Shell-Source:
 ```
@@ -288,6 +298,51 @@ Shared Dependency-Versionen im `catalog:` Block in `pnpm-workspace.yaml`.
 - **AnimatePresence:** Muss `mode="wait"` haben in PlantScene.tsx, sonst überlappen Karten-Animationen.
 - **Vite Proxy:** Nur aktiv wenn `REPL_ID` nicht gesetzt ist (kein Replit). Proxyt `/api` → `localhost:8000`.
 - **Replit-Plugins:** `runtimeErrorOverlay()` und `cartographer()` sind in vite.config.ts hinter `process.env.REPL_ID !== undefined` gegateed.
+
+---
+
+## Authentifizierung (Clerk)
+
+### Routen-Schutz (Frontend — App.tsx)
+| Route | Zugang |
+|-------|--------|
+| `/` | Öffentlich |
+| `/sign-in` | Öffentlich |
+| `/track/:token` | Öffentlich |
+| `/apply` | Clerk sign-in erforderlich |
+| `/applications/:id` | Clerk sign-in + eigene Bewerbung ODER audi_staff |
+| `/applications` | Nur `audi_staff` |
+| `/departments`, `/departments/:id` | Nur `audi_staff` |
+
+### API-Schutz (Backend — auth.ts)
+| Endpoint | Middleware |
+|----------|-----------|
+| `POST /chat` | `requireAuth` |
+| `POST /extract-pdf` | `requireAuth` |
+| `POST /applications` | `requireAuth` |
+| `GET /applications` | `requireAuth` (audi_staff sieht alle, andere nur eigene) |
+| `GET /applications/:id` | `requireAuth` (owner oder audi_staff) |
+| `PATCH /applications/:id` | `requireAudiStaff` |
+| `GET /applications/track/:token` | Öffentlich |
+
+### Audi-Staff-Rolle vergeben
+Im [Clerk Dashboard](https://dashboard.clerk.com) → Users → Nutzer auswählen → **Edit public metadata**:
+```json
+{ "role": "audi_staff" }
+```
+
+### Components
+- `src/lib/auth.ts` — `requireAuth`, `requireAudiStaff`, `getUserId`, `isAudiStaff`
+- `src/pages/SignIn.tsx` — Clerk `<SignIn>` mit Audi-Styling
+- `App.tsx` → `<Protected>` (sign-in required) und `<AudiStaffOnly>` (role required)
+- `Apply.tsx` → `UserButton` im Header, `getToken()` für API-Calls
+
+### Clerk-Keys einrichten
+1. Konto erstellen: [dashboard.clerk.com](https://dashboard.clerk.com)
+2. Neue Application anlegen
+3. Keys kopieren in:
+   - `artifacts/api-server/.env` → `CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
+   - `artifacts/audi-innovation-hub/.env.local` → `VITE_CLERK_PUBLISHABLE_KEY`
 
 ---
 

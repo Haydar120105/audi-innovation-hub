@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { requireAuth } from "../lib/auth";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ const upload = multer({
 const REQUIRED_FIELDS = ["companyName", "problem", "solution", "technology", "stage", "teamSize", "targetDepartments"];
 const ALL_FIELDS = [...REQUIRED_FIELDS, "website", "pitchDeckUrl", "additionalContext"];
 
-router.post("/extract-pdf", upload.single("file"), async (req, res): Promise<void> => {
+router.post("/extract-pdf", requireAuth, upload.single("file"), async (req, res): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: "No PDF file provided" });
     return;
