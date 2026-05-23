@@ -1,6 +1,7 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn, useAuth } from "@clerk/clerk-react";
+import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn, useUser } from "@clerk/clerk-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
@@ -36,11 +37,10 @@ function Protected({ children }: { children: React.ReactNode }) {
 
 /** Wraps a component so it redirects to /sign-in AND requires audi_staff role. */
 function AudiStaffOnly({ children }: { children: React.ReactNode }) {
-  const { sessionClaims, isSignedIn, isLoaded } = useAuth();
+  const { user, isLoaded } = useUser();
   if (!isLoaded) return null;
-  if (!isSignedIn) return <RedirectToSignIn />;
-  const meta = sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
-  const role = meta?.["role"];
+  if (!user) return <RedirectToSignIn />;
+  const role = user.publicMetadata?.["role"] as string | undefined;
   // superusers can also access staff pages
   if (role !== "audi_staff" && role !== "superuser") {
     return (
@@ -56,11 +56,10 @@ function AudiStaffOnly({ children }: { children: React.ReactNode }) {
 
 /** Wraps a component — requires superuser role. */
 function SuperuserOnly({ children }: { children: React.ReactNode }) {
-  const { sessionClaims, isSignedIn, isLoaded } = useAuth();
+  const { user, isLoaded } = useUser();
   if (!isLoaded) return null;
-  if (!isSignedIn) return <RedirectToSignIn />;
-  const meta = sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
-  if (meta?.["role"] !== "superuser") {
+  if (!user) return <RedirectToSignIn />;
+  if (user.publicMetadata?.["role"] !== "superuser") {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "#0A0A14" }}>
         <div className="text-center">
@@ -71,6 +70,31 @@ function SuperuserOnly({ children }: { children: React.ReactNode }) {
     );
   }
   return <>{children}</>;
+}
+
+/**
+ * Redirects superusers → /admin, Audi staff → /applications.
+ *
+ * Uses useUser() (not sessionClaims) so that publicMetadata is always
+ * fresh — no re-login required after a role change in the Clerk dashboard.
+ */
+function DashboardRouter() {
+  const { user, isLoaded } = useUser();
+  const [, setLocation] = useLocation();
+
+  // Read directly from user.publicMetadata — always up to date
+  const role = user?.publicMetadata?.["role"] as string | undefined;
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (role === "superuser") setLocation("/admin");
+    else if (role === "audi_staff") setLocation("/applications");
+  }, [isLoaded, role]); // intentionally omit setLocation (stable ref, avoids re-fires)
+
+  // Show nothing while loading or while the redirect fires
+  if (!isLoaded || role === "superuser" || role === "audi_staff") return null;
+
+  return <ApplicantDashboard />;
 }
 
 function Router() {
@@ -87,7 +111,7 @@ function Router() {
 
       {/* Applicants + staff */}
       <Route path="/dashboard">
-        <Protected><ApplicantDashboard /></Protected>
+        <Protected><DashboardRouter /></Protected>
       </Route>
       <Route path="/apply">
         <Protected><Apply /></Protected>

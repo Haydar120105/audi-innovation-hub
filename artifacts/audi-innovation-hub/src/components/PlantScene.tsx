@@ -280,8 +280,10 @@ function MovingCar({ path, duration, delay, color }: {
       const a = path[seg], b = path[Math.min(seg + 1, totalLen)];
       const cx = isoX(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac);
       const cy = isoY(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac, 0.06);
-      const nx = isoX(b[0], b[1]);
-      setPos({ x: cx, y: cy, flip: nx < cx });
+      // Compare segment endpoint with segment start — stable throughout the whole segment
+      const startX = isoX(a[0], a[1]);
+      const endX   = isoX(b[0], b[1]);
+      setPos({ x: cx, y: cy, flip: endX < startX });
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -317,8 +319,10 @@ function MovingF1Car({ path, duration, delay, color }: {
       const a = path[seg], b = path[Math.min(seg + 1, totalLen)];
       const cx = isoX(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac);
       const cy = isoY(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac, 0.06);
-      const nx = isoX(b[0], b[1]);
-      setPos({ x: cx, y: cy, flip: nx < cx });
+      // Stable direction: compare segment start vs end in screen space
+      const startX = isoX(a[0], a[1]);
+      const endX   = isoX(b[0], b[1]);
+      setPos({ x: cx, y: cy, flip: endX < startX });
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -534,7 +538,7 @@ const LABEL_LAYOUT: Record<string, {
   textAnchor: "start" | "end";
 }> = {
   production: { viaX: 240, viaY: 218, endX: 95,  endY: 218, textAnchor: "end"   },
-  rnd:        { viaX: 700, viaY: 52,  endX: 930,  endY: 52,  textAnchor: "start" },
+  rnd:        { viaX: 640, viaY: 52,  endX: 820,  endY: 52,  textAnchor: "start" },
   design:     { viaX: 750, viaY: 255, endX: 870,  endY: 255, textAnchor: "start" },
   logistics:  { viaX: 145, viaY: 448, endX: 90,   endY: 448, textAnchor: "end"   },
   sales:      { viaX: 380, viaY: 535, endX: 265,  endY: 535, textAnchor: "end"   },
@@ -750,11 +754,19 @@ export default function PlantScene() {
             points={pts.map(([px, py]) => `${isoX(px, py)},${isoY(px, py, 0.02)}`).join(" ")} />
         ))}
 
-        {/* Road cars — inner factory roads */}
-        <MovingCar path={loopRed}   duration={18} delay={0}  color="#7A1018" />
-        <MovingCar path={loopBlue}  duration={22} delay={6}  color="#0E2E58" />
-        {/* F1 car — outer circuit only */}
-        <MovingF1Car path={F1_TRACK} duration={28} delay={2} color="#BB0A21" />
+        {/* Road cars — outer loop (CCW red, CW blue) */}
+        <MovingCar path={loopRed}   duration={18} delay={0}    color="#7A1018" />
+        <MovingCar path={loopBlue}  duration={20} delay={5}    color="#0E2E58" />
+        <MovingCar path={loopRed}   duration={18} delay={11}   color="#1A1A40" />
+        {/* Road cars — inner factory roads (loopBlack) */}
+        <MovingCar path={loopBlack} duration={13} delay={1}    color="#3A3A52" />
+        <MovingCar path={loopBlack} duration={13} delay={4.8}  color="#1E3820" />
+        <MovingCar path={loopBlack} duration={13} delay={8.5}  color="#502010" />
+        <MovingCar path={loopBlack} duration={13} delay={11.2} color="#202040" />
+        {/* F1 cars — outer circuit, 3 cars with even spacing */}
+        <MovingF1Car path={F1_TRACK} duration={26} delay={0}   color="#BB0A21" />
+        <MovingF1Car path={F1_TRACK} duration={26} delay={9}   color="#C8C8D8" />
+        <MovingF1Car path={F1_TRACK} duration={26} delay={17}  color="#E8E0C0" />
 
         {/* ── BUILDINGS ── dark futuristic palette ── */}
         {/* 1 Production — deep blue-violet */}
