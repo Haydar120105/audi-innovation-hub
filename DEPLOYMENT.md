@@ -1,5 +1,18 @@
 # Deployment — Strato VPS (VC2-4, 4 GB RAM)
 
+## Aktueller Stand
+
+| Was | Wo |
+|-----|----|
+| Server | Strato VPS Linux VC2-4, 4 GB RAM |
+| IP | `85.215.132.195` |
+| Domain | noch keine — läuft über IP (HTTP) |
+| Betriebssystem | Ubuntu 22.04 LTS |
+| Repo auf Server | `/root/audi-innovation-hub` |
+| Clerk-Keys | Test-Keys (`pk_test_...`) — für Produktion später auf Live-Keys umstellen |
+
+Aufruf im Browser: **http://85.215.132.195**
+
 ## Architektur
 
 ```
@@ -108,20 +121,37 @@ pnpm --filter @workspace/db run push
 
 ---
 
-## Updates einspielen
+## Updates einspielen (Deploy-Workflow)
+
+Lokal entwickeln, committen, pushen — dann auf dem Server:
 
 ```bash
 cd ~/audi-innovation-hub
 git pull
-docker compose build
-docker compose up -d
+docker compose --env-file .env.production build
+docker compose --env-file .env.production up -d
 ```
+
+> **Wichtig:** `--env-file .env.production` immer angeben, damit `VITE_CLERK_PUBLISHABLE_KEY`
+> beim Build korrekt übergeben wird (wird in den JS-Bundle eingebettet).
 
 Für reine API-Updates (kein Frontend rebuild):
 ```bash
-docker compose build api
-docker compose up -d api
+docker compose --env-file .env.production build api
+docker compose --env-file .env.production up -d api
 ```
+
+### Lokale Entwicklung
+
+```bash
+# Terminal 1 — Backend
+pnpm --filter @workspace/api-server run dev
+
+# Terminal 2 — Frontend
+pnpm --filter @workspace/audi-innovation-hub run dev
+```
+
+Änderungen lokal testen → `git push` → auf Server deployen.
 
 ---
 
@@ -166,12 +196,44 @@ docker compose down --rmi all
 
 ---
 
+## Domain + HTTPS nachrüsten (wenn Domain vorhanden)
+
+```bash
+# 1. Domain in nginx.conf eintragen
+sed -i 's/YOUR_DOMAIN/hub.deinedomain.de/g' docker/nginx.conf
+
+# 2. Sicherstellen dass nginx-init.conf aktiv ist (HTTP-only für Certbot)
+sed -i 's|docker/nginx.conf|docker/nginx-init.conf|' docker-compose.yml
+docker compose --env-file .env.production up -d nginx
+
+# 3. Zertifikat holen
+docker compose run --rm --profile certbot certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d hub.deinedomain.de \
+  --email deine@email.de \
+  --agree-tos --no-eff-email
+
+# 4. Auf HTTPS-Config umschalten
+sed -i 's|docker/nginx-init.conf|docker/nginx.conf|' docker-compose.yml
+docker compose --env-file .env.production up -d nginx
+
+# 5. Clerk Production-Keys eintragen
+nano .env.production   # pk_live_... und sk_live_... eintragen
+docker compose --env-file .env.production build nginx
+docker compose --env-file .env.production up -d
+```
+
+---
+
 ## Troubleshooting
 
 | Problem | Lösung |
 |---------|--------|
 | `api` startet nicht | `docker compose logs api` — wahrscheinlich fehlende Env-Var |
 | nginx gibt 502 | API noch nicht `healthy` — kurz warten oder `docker compose logs api` |
-| Clerk-Login schlägt fehl | `VITE_CLERK_PUBLISHABLE_KEY` stimmt nicht — Image neu bauen |
+| Clerk-Login schlägt fehl | `VITE_CLERK_PUBLISHABLE_KEY` stimmt nicht — Image mit `--env-file .env.production` neu bauen |
 | Zertifikat-Fehler | DNS noch nicht propagiert — warten und erneut versuchen |
 | Port 80/443 belegt | `ss -tlnp \| grep -E '80\|443'` — anderer Prozess blockiert |
+| `pnpm frozen-lockfile` Fehler | `sed -i 's/--frozen-lockfile/--no-frozen-lockfile/g' docker/api.Dockerfile docker/nginx.Dockerfile` |
+| `tsconfig.base.json` nicht gefunden | In `docker/nginx.Dockerfile` nach `COPY lib/ ./lib/` folgendes ergänzen: `COPY tsconfig.base.json ./` und `COPY tsconfig.json ./` |
+| `VITE_CLERK_PUBLISHABLE_KEY not set` Warning | Harmlos — Key wurde bereits beim Build eingebettet. Beim `up` wird er nicht mehr benötigt. |
