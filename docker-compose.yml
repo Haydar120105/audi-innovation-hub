@@ -1,0 +1,51 @@
+services:
+
+  # ── API Server (Express + Node.js) ──────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    restart: unless-stopped
+    env_file: .env.production
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── nginx (static frontend + reverse proxy) ──────────────────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx.Dockerfile
+      args:
+        # VITE_CLERK_PUBLISHABLE_KEY is baked into the JS bundle at build time.
+        # Use your live key (pk_live_...) for production.
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # nginx config (mounted, not baked — allows hot-swap without rebuild)
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Let's Encrypt certificates (managed by certbot service below)
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ── Certbot (on-demand, not a persistent daemon) ─────────────────────────────
+  # Run manually: docker compose run --rm certbot certonly ...
+  # See DEPLOYMENT.md for full instructions.
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    profiles:
+      - certbot   # only started when explicitly requested

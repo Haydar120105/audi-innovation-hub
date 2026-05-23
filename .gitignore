@@ -45,6 +45,11 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!.env.production.example
+
+# Docker runtime data
+certbot/conf/
+certbot/www/
 
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
