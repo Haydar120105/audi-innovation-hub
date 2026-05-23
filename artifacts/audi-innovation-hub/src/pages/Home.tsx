@@ -4,6 +4,7 @@ import PlantScene from "../components/PlantScene";
 import Benefits from "../components/Benefits";
 import FocusAreas from "../components/FocusAreas";
 import Testimonials from "../components/Testimonials";
+import MoreOpportunities from "../components/MoreOpportunities";
 
 function TopRightNav() {
   const { sessionClaims, isSignedIn, isLoaded } = useAuth();
@@ -102,6 +103,7 @@ export default function Home() {
       <FocusAreas />
       <Benefits />
       <Testimonials />
+      <MoreOpportunities />
     </div>
   );
 }
