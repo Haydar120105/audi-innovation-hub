@@ -9,7 +9,9 @@ import { ApplicationsList, ApplicationDetail } from "@/pages/Applications";
 import { DepartmentsList, DepartmentView } from "@/pages/DepartmentPortal";
 import Track from "@/pages/Track";
 import SignInPage from "@/pages/SignIn";
+import SignUpPage from "@/pages/SignUp";
 import AdminDashboard from "@/pages/Admin";
+import ApplicantDashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/not-found";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
@@ -76,12 +78,17 @@ function Router() {
     <Switch>
       {/* Public */}
       <Route path="/" component={Home} />
-      {/* Catch all /sign-in sub-paths Clerk navigates to internally */}
+      {/* Catch all /sign-in and /sign-up sub-paths Clerk navigates to internally */}
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-in/:rest*" component={SignInPage} />
+      <Route path="/sign-up" component={SignUpPage} />
+      <Route path="/sign-up/:rest*" component={SignUpPage} />
       <Route path="/track/:token" component={Track} />
 
       {/* Applicants + staff */}
+      <Route path="/dashboard">
+        <Protected><ApplicantDashboard /></Protected>
+      </Route>
       <Route path="/apply">
         <Protected><Apply /></Protected>
       </Route>
@@ -116,6 +123,7 @@ function App() {
     <ClerkProvider
       publishableKey={PUBLISHABLE_KEY}
       signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       afterSignOutUrl="/"
     >
       <QueryClientProvider client={queryClient}>

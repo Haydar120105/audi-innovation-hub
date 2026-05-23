@@ -1,67 +1,92 @@
 import { Link } from "wouter";
-import { SignedIn, SignedOut, UserButton, useAuth } from "@clerk/clerk-react";
+import { UserButton, useAuth } from "@clerk/clerk-react";
 import PlantScene from "../components/PlantScene";
 import Benefits from "../components/Benefits";
 import FocusAreas from "../components/FocusAreas";
+import Testimonials from "../components/Testimonials";
 
 function TopRightNav() {
-  const { sessionClaims } = useAuth();
+  const { sessionClaims, isSignedIn, isLoaded } = useAuth();
   const meta = sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
   const role = meta?.["role"] as string | undefined;
   const isSuperuser = role === "superuser";
   const isStaff = role === "audi_staff" || isSuperuser;
 
-  const btnStyle = {
+  if (!isLoaded) return null;
+
+  const ghost = {
     background: "rgba(255,255,255,0.07)",
     color: "rgba(255,255,255,0.55)",
     border: "1px solid rgba(255,255,255,0.1)",
     backdropFilter: "blur(8px)",
   };
 
+  // Role badge config
+  const roleBadge = isSuperuser
+    ? { label: "Admin", color: "rgba(245,158,11,0.85)", border: "rgba(245,158,11,0.25)" }
+    : isStaff
+    ? { label: "Audi Staff", color: "rgba(255,255,255,0.65)", border: "rgba(255,255,255,0.15)" }
+    : role
+    ? { label: "Applicant", color: "rgba(255,255,255,0.4)", border: "rgba(255,255,255,0.08)" }
+    : null;
+
+  // Dashboard destination depends on role
+  const dashboardHref = isSuperuser ? "/admin" : isStaff ? "/applications" : "/dashboard";
+  const dashboardStyle = isSuperuser
+    ? { ...ghost, color: "rgba(245,158,11,0.85)", border: "1px solid rgba(245,158,11,0.22)" }
+    : ghost;
+
   return (
     <div className="fixed top-5 right-6 z-50 flex items-center gap-2">
-      <SignedIn>
-        {isSuperuser && (
-          <Link href="/admin">
-            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all hidden sm:inline-flex items-center gap-1.5"
-              style={{ ...btnStyle, color: "rgba(245,158,11,0.8)", border: "1px solid rgba(245,158,11,0.2)" }}>
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                <circle cx="5.5" cy="4" r="2" stroke="currentColor" strokeWidth="1.1"/>
-                <path d="M1 10c0-2.5 2-3.5 4.5-3.5S10 7.5 10 10" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-              </svg>
-              Admin
-            </button>
-          </Link>
-        )}
-        {isStaff && (
-          <Link href="/applications">
-            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all hidden sm:inline-flex items-center gap-1.5"
-              style={btnStyle}>
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="opacity-60">
-                <rect x="0.5" y="0.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
-                <rect x="6.5" y="0.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
-                <rect x="0.5" y="6.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
-                <rect x="6.5" y="6.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
-              </svg>
+      {isSignedIn ? (
+        <>
+          {/* Role badge */}
+          {roleBadge && (
+            <span
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-sm tracking-wide"
+              style={{
+                color: roleBadge.color,
+                border: `1px solid ${roleBadge.border}`,
+                background: "rgba(255,255,255,0.04)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              {roleBadge.label}
+            </span>
+          )}
+
+          {/* Single Dashboard button — routes to role-specific view */}
+          <Link href={dashboardHref}>
+            <button
+              className="px-3 py-1.5 text-xs font-semibold rounded-sm hidden sm:inline-flex items-center gap-1.5 transition-opacity hover:opacity-80"
+              style={dashboardStyle}
+            >
               Dashboard
             </button>
           </Link>
-        )}
-        <UserButton afterSignOutUrl="/" />
-      </SignedIn>
 
-      <SignedOut>
-        <Link href="/sign-in">
-          <button className="px-4 py-2 text-xs font-semibold rounded-sm transition-all flex items-center gap-2"
-            style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <circle cx="6.5" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M1 12c0-3 2.5-4.5 5.5-4.5S12 9 12 12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            Staff Login
-          </button>
-        </Link>
-      </SignedOut>
+          <UserButton afterSignOutUrl="/" />
+        </>
+      ) : (
+        <>
+          <Link href="/sign-in">
+            <button
+              className="px-4 py-2 text-xs font-semibold rounded-sm transition-opacity hover:opacity-80"
+              style={ghost}
+            >
+              Log in
+            </button>
+          </Link>
+          <Link href="/sign-up">
+            <button
+              className="px-4 py-2 text-xs font-semibold rounded-sm text-white transition-opacity hover:opacity-85"
+              style={{ background: "#BB0A21" }}
+            >
+              Register
+            </button>
+          </Link>
+        </>
+      )}
     </div>
   );
 }
@@ -76,6 +101,7 @@ export default function Home() {
       </div>
       <FocusAreas />
       <Benefits />
+      <Testimonials />
     </div>
   );
 }

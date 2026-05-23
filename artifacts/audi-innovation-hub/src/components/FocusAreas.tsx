@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link } from "wouter";
 
 const FOCUS_AREAS = [
   {
@@ -140,13 +141,15 @@ export default function FocusAreas() {
         transition={{ delay: 0.3, duration: 0.6 }}
         className="max-w-7xl mx-auto mt-12 flex items-center gap-6"
       >
-        <button
-          className="bg-[#BB0A21] hover:bg-[#A0081C] text-white px-10 py-4 font-medium transition-colors flex items-center gap-2 rounded-sm text-sm tracking-wide"
-          data-testid="button-apply-now"
-        >
-          <span>Apply Now</span>
-          <span>&rarr;</span>
-        </button>
+        <Link href="/apply">
+          <button
+            className="bg-[#BB0A21] hover:bg-[#A0081C] text-white px-10 py-4 font-medium transition-colors flex items-center gap-2 rounded-sm text-sm tracking-wide"
+            data-testid="button-apply-now"
+          >
+            <span>Apply Now</span>
+            <span>&rarr;</span>
+          </button>
+        </Link>
         <p className="text-white/25 text-xs">
           Fast, unbureaucratic, and seamless collaboration.
         </p>

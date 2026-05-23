@@ -44,6 +44,15 @@ function hitZone(x: number, y: number, h: number, w: number, d: number): string 
   ].map(p => p.join(",")).join(" ");
 }
 
+// ── F1 circuit — outer loop around the factory complex ──────────
+const F1_TRACK: [number, number][] = [
+  [-3.5,  0.5], [-3.5, -0.5], [-2.8, -2.0], [-1.2, -3.2],
+  [ 0.5, -3.5], [ 2.5, -3.2], [ 4.5, -2.2], [ 6.2, -0.8],
+  [ 7.0,  0.8], [ 7.2,  2.5], [ 6.5,  4.2], [ 5.0,  5.8],
+  [ 3.0,  6.8], [ 1.0,  7.0], [-1.0,  6.5], [-2.5,  5.2],
+  [-3.5,  3.8], [-3.5,  2.0], [-3.5,  0.5],
+];
+
 interface BoxProps {
   x: number; y: number; z?: number;
   w: number; d: number; h: number;
@@ -99,115 +108,166 @@ function Windows({ x, y, z, w, d, h, side }: { x: number; y: number; z: number; 
   return <>{els}</>;
 }
 
-// R8-inspired Audi — side-elevation profile, illustrative 3D style
-function SpokeWheel({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+// ── Spoke wheel — shared between AudiCar instances ──────────────
+function SpokeWheel({ r = 6 }: { r?: number }) {
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill="#0C0C14" />
-      <circle cx={cx} cy={cy} r={r * 0.78} fill="#191920" />
-      {[0, 72, 144, 216, 288].map((deg, j) => {
-        const rad = (deg - 18) * Math.PI / 180;
-        return (
-          <line key={j}
-            x1={cx + Math.cos(rad) * r * 0.18}
-            y1={cy + Math.sin(rad) * r * 0.18}
-            x2={cx + Math.cos(rad) * r * 0.72}
-            y2={cy + Math.sin(rad) * r * 0.72}
-            stroke="#7A7A90" strokeWidth={r * 0.22} strokeLinecap="round"
-          />
-        );
+      <circle cx={0} cy={0} r={r} fill="#0A0A18" />
+      <circle cx={0} cy={0} r={r - 1.5} fill="#141428" />
+      {[0, 60, 120, 180, 240, 300].map(deg => {
+        const rad = deg * Math.PI / 180;
+        return <line key={deg}
+          x1={Math.cos(rad) * 2} y1={Math.sin(rad) * 2}
+          x2={Math.cos(rad) * (r - 2)} y2={Math.sin(rad) * (r - 2)}
+          stroke="#303050" strokeWidth={1.2} />;
       })}
-      <circle cx={cx} cy={cy} r={r * 0.22} fill="#505060" />
-      <circle cx={cx} cy={cy} r={r * 0.12} fill="#909098" />
+      <circle cx={0} cy={0} r={2} fill="#606080" />
     </g>
   );
 }
 
-function AudiCar({ cx, cy, color }: { cx: number; cy: number; color: string }) {
+// ── Audi road car — sleek sedan, side profile ────────────────────
+function AudiCar({ color = "#7A1018" }: { color?: string }) {
   return (
-    <g transform={`translate(${cx},${cy}) scale(0.55)`} opacity={0.78}>
-      {/* Ground shadow */}
-      <ellipse rx={24} ry={6} cy={11} fill="rgba(0,0,0,0.5)" />
-
-      {/* ── Lower body / rocker panel ── */}
-      <path
-        d="M -21,3 C -21,3 -19,-1 -15,-3 C -11,-5 -5,-6.5 2,-7 C 8,-7.5 14,-6 18,-4 C 21,-2 22,1 21,5 C 20,7 17,8 12,8 C 4,8 -12,8 -17,8 C -20,8 -21,6 -21,3 Z"
-        fill={color}
-        style={{ filter: "brightness(0.82)" }}
-      />
-
-      {/* ── Top body highlight (light hits the hood & door) ── */}
-      <path
-        d="M -9,-2 C -4,-5.5 3,-7 9,-6.5 C 14,-6 18,-4 19,-2 C 15,-1 9,0 2,0.5 C -4,1 -9,0.5 -9,-2 Z"
-        fill={color}
-        style={{ filter: "brightness(1.25)" }}
-        opacity={0.9}
-      />
-
-      {/* ── Cabin / roof ── */}
-      <path
-        d="M -10,-5 C -8,-10 -3,-13 2,-13.5 C 7,-14 11,-12 13,-9 C 14,-7 12,-5.5 9,-5.5 C 4,-5.5 -7,-5.5 -10,-5.5 Z"
-        fill={color}
-        style={{ filter: "brightness(1.18)" }}
-      />
-
+    <g opacity={0.9}>
+      {/* Shadow */}
+      <ellipse cx={0} cy={8} rx={24} ry={3.5} fill="rgba(0,0,0,0.5)" />
+      {/* Body lower sill */}
+      <path d="M -16,2 L 16,2 L 17,5 L -17,5 Z" fill={color} style={{ filter: "brightness(0.65)" }} />
+      {/* Cabin — sedan profile */}
+      <path d="M -10,-1 C -8,-5 -2,-8 5,-8 C 11,-8 14,-5 15,-1 Z"
+        fill={color} style={{ filter: "brightness(0.9)" }} />
+      {/* Front hood */}
+      <path d="M 15,-1 L 18,2 L 16,2 Z" fill={color} style={{ filter: "brightness(0.8)" }} />
+      {/* Rear deck */}
+      <path d="M -10,-1 L -17,2 L -16,2 Z" fill={color} style={{ filter: "brightness(0.75)" }} />
       {/* Windshield */}
-      <path d="M -7,-6 C -5,-10 -1,-13 3,-13 C 7,-13 10,-10 10,-7 L 8,-5.5 Z"
-        fill="rgba(160,210,255,0.22)" />
+      <path d="M -2,-7.5 L 11,-6 L 14,-1 L -1,-1 Z" fill="rgba(130,170,210,0.45)" />
       {/* Rear window */}
-      <path d="M -10,-5.5 C -9,-9 -7,-11 -5,-12 L -7,-5.5 Z"
-        fill="rgba(160,210,255,0.12)" />
-
-      {/* A-pillar line */}
-      <line x1={-7} y1={-5.5} x2={-4} y2={-12}
-        stroke="rgba(0,0,0,0.3)" strokeWidth="0.8" />
-
-      {/* ── R8 side blade air intake ── */}
-      <path d="M 10,-3.5 L 15,-3.5 L 16,-1.5 L 11,-1 Z"
-        fill="rgba(0,0,0,0.38)" />
-      <path d="M 10.5,-3.5 L 14.5,-3.5 L 14.5,-2.8 L 10.5,-2.8 Z"
-        fill="rgba(0,0,0,0.2)" />
-
-      {/* ── Rear spoiler ── */}
-      <rect x={18.5} y={-2.5} width={4} height={2} rx={1}
-        fill={color} style={{ filter: "brightness(1.12)" }} />
-      <rect x={19} y={-4.5} width={3} height={2.2} rx={0.7}
-        fill={color} style={{ filter: "brightness(1.08)" }} />
-
-      {/* ── Wheels ── 2 large R8 spoked rims, side profile ── */}
-      <SpokeWheel cx={-13} cy={8} r={8} />
-      <SpokeWheel cx={11} cy={8} r={8} />
-
-      {/* Wheel arch cutouts on body */}
-      <circle cx={-13} cy={8} r={9.5} fill="none" stroke={color}
-        strokeWidth="1.5" style={{ filter: "brightness(0.5)" }}
-        clipPath="url(#bodyClip)" opacity={0.6} />
-      <circle cx={11} cy={8} r={9.5} fill="none" stroke={color}
-        strokeWidth="1.5" style={{ filter: "brightness(0.5)" }}
-        clipPath="url(#bodyClip)" opacity={0.6} />
-
-      {/* ── Headlights — R8 blade DRL style ── */}
-      <path d="M 20,1 L 23,0 L 23,3 L 20,3 Z" fill="rgba(255,248,200,0.95)" />
-      <path d="M 20,-1.5 L 22,-2 L 22,0 L 20,0 Z" fill="rgba(255,248,200,0.55)" />
-      {/* Headlight inner glow */}
-      <ellipse cx={21.5} cy={1.5} rx={1.2} ry={0.8} fill="rgba(255,255,240,0.5)" />
-
-      {/* ── Tail lights ── */}
-      <path d="M -20,1.5 L -23,1 L -23,4 L -20,4 Z" fill="rgba(255,35,35,0.95)" />
-      <path d="M -20,-0.5 L -22,-1 L -22,1 L -20,1 Z" fill="rgba(255,35,35,0.45)" />
-
-      {/* ── Audi four rings ── */}
-      {[1.5, 4.5, 7.5, 10.5].map((rx, i) => (
-        <circle key={i} cx={rx} cy={-3}
-          r={1.8} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.6" />
+      <path d="M -10,-1 L -7,-6.5 L -2,-7.5 L -1,-1 Z" fill="rgba(100,140,190,0.38)" />
+      {/* Window highlight */}
+      <line x1={2} y1={-7.8} x2={10} y2={-6.5} stroke="rgba(255,255,255,0.18)" strokeWidth={0.7} />
+      {/* Headlight */}
+      <rect x={15.5} y={0.5} width={3} height={1.8} rx={0.4} fill="rgba(255,248,200,0.9)" />
+      {/* Taillight */}
+      <rect x={-18} y={0.5} width={1.8} height={2} rx={0.4} fill="rgba(210,20,10,0.9)" />
+      {/* Front wheel */}
+      <g transform="translate(11,6)"><SpokeWheel r={5} /></g>
+      {/* Rear wheel */}
+      <g transform="translate(-10,6)"><SpokeWheel r={5.5} /></g>
+      {/* Audi four rings */}
+      {[-4.5, -1.5, 1.5, 4.5].map(cx => (
+        <circle key={cx} cx={cx} cy={1} r={1.6} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={0.5} />
       ))}
     </g>
   );
 }
 
-function MovingCar({ path, duration, delay, color }: { path: [number, number][]; duration: number; delay: number; color: string }) {
-  const [pos, setPos] = useState({ x: isoX(path[0][0], path[0][1]), y: isoY(path[0][0], path[0][1], 0.05) });
+// ── F1 car — open-wheel single-seater, side profile ────────────
+function F1Car({ color = "#BB0A21" }: { color?: string }) {
+  return (
+    <g opacity={0.96}>
+      {/* Shadow */}
+      <ellipse cx={0} cy={9} rx={30} ry={4} fill="rgba(0,0,0,0.6)" />
+
+      {/* Front wing — wide, multi-element */}
+      <path d="M 22,-1 L 36,-1 L 36,1.5 L 22,1.5 Z" fill={color} style={{ filter: "brightness(0.9)" }} />
+      <path d="M 23,-3 L 33,-3 L 33,-1 L 23,-1 Z" fill={color} style={{ filter: "brightness(0.8)" }} />
+      <rect x={35} y={-4} width={2.5} height={7} rx={0.6} fill={color} style={{ filter: "brightness(0.75)" }} />
+
+      {/* Nose cone — narrow & long */}
+      <path d="M 36,0 C 30,-0.2 24,-0.4 20,-0.5 L 20,0.5 C 24,0.4 30,0.2 36,0 Z"
+        fill={color} style={{ filter: "brightness(0.85)" }} />
+
+      {/* Main body — very flat */}
+      <path d="M 20,-0.5 C 15,-2 6,-3.5 -1,-3.8 C -7,-3.8 -13,-3.2 -17,-2 C -20,-1.3 -21,0 -20,2 C -16,3 8,3 20,0.5 Z"
+        fill={color} style={{ filter: "brightness(0.7)" }} />
+
+      {/* Body highlight */}
+      <path d="M 3,-3.8 C 7,-4.3 14,-3.5 18,-2.2 C 14,-1.8 7,-1.6 3,-1.8 Z"
+        fill="rgba(255,255,255,0.2)" />
+
+      {/* Sidepod air intake */}
+      <path d="M 6,-3.2 L 9,-3.2 L 9,-1.5 L 6,-1.5 Z" fill="rgba(0,0,0,0.5)" />
+
+      {/* Cockpit */}
+      <path d="M 3,-3.8 C 4,-6.5 6,-7.5 8,-7 C 10,-6.5 10,-5 9,-3 Z"
+        fill="rgba(8,8,24,0.95)" />
+      <path d="M 2,-3.8 C 3,-7 6,-8 8,-7.5 C 10,-7 11,-5.5 9.5,-3 L 9,-3 Z"
+        fill={color} style={{ filter: "brightness(1.15)" }} />
+
+      {/* Halo */}
+      <path d="M 2,-3.8 Q 5.5,-10 9.5,-3"
+        stroke={color} strokeWidth={2.5} fill="none" style={{ filter: "brightness(1.4)" }} />
+      <line x1={5.5} y1={-9.8} x2={5.5} y2={-3.8}
+        stroke={color} strokeWidth={1.8} style={{ filter: "brightness(1.3)" }} />
+
+      {/* Rear body taper */}
+      <path d="M -17,-2 C -20,-1.5 -21,-0.5 -21,0.5 C -21,1.5 -20,2.5 -17,3"
+        fill={color} style={{ filter: "brightness(0.55)" }} />
+
+      {/* Exhaust plume */}
+      <ellipse cx={-22} cy={1} rx={4} ry={1.8} fill="rgba(255,130,20,0.8)" />
+      <ellipse cx={-24} cy={1} rx={2} ry={1} fill="rgba(255,210,80,0.65)" />
+
+      {/* Rear wing — high & aggressive */}
+      <path d="M -20,-9 L -11,-9 L -11,-6 L -20,-6 Z"
+        fill={color} style={{ filter: "brightness(1.2)" }} />
+      <path d="M -20,-6 L -11,-6 L -11,-4.2 L -20,-4.2 Z"
+        fill={color} style={{ filter: "brightness(0.9)" }} />
+      <rect x={-18.5} y={-4.2} width={2} height={7.5}
+        fill={color} style={{ filter: "brightness(0.72)" }} />
+      <rect x={-22} y={-10} width={2.5} height={13} rx={0.5}
+        fill={color} style={{ filter: "brightness(0.65)" }} />
+
+      {/* Front wheel — narrow slick */}
+      <circle cx={20} cy={7} r={5.5} fill="#06060F" />
+      <circle cx={20} cy={7} r={3.5} fill="#10101C" />
+      {[0,60,120,180,240,300].map(deg => {
+        const rad = deg * Math.PI / 180;
+        return <line key={deg}
+          x1={20 + Math.cos(rad) * 1.2} y1={7 + Math.sin(rad) * 1.2}
+          x2={20 + Math.cos(rad) * 3.2} y2={7 + Math.sin(rad) * 3.2}
+          stroke="#383848" strokeWidth={1} />;
+      })}
+      <circle cx={20} cy={7} r={1.1} fill="#909098" />
+
+      {/* Rear wheel — wide slick */}
+      <circle cx={-14} cy={7} r={7} fill="#06060F" />
+      <circle cx={-14} cy={7} r={4.5} fill="#10101C" />
+      {[0,60,120,180,240,300].map(deg => {
+        const rad = deg * Math.PI / 180;
+        return <line key={deg}
+          x1={-14 + Math.cos(rad) * 1.5} y1={7 + Math.sin(rad) * 1.5}
+          x2={-14 + Math.cos(rad) * 4.2} y2={7 + Math.sin(rad) * 4.2}
+          stroke="#383848" strokeWidth={1.3} />;
+      })}
+      <circle cx={-14} cy={7} r={1.4} fill="#909098" />
+
+      {/* Audi four rings on sidepod */}
+      {[2.5, 5.5, 8.5, 11.5].map(rx => (
+        <circle key={rx} cx={rx} cy={-2.5}
+          r={1.5} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={0.5} />
+      ))}
+
+      {/* DRL headlight strip */}
+      <path d="M 34,-0.5 L 37,-0.5 L 37,0.5 L 34,0.5 Z" fill="rgba(255,255,200,0.95)" />
+      {/* Brake glow */}
+      <ellipse cx={-23} cy={0.5} rx={1.5} ry={0.8} fill="rgba(255,40,10,0.9)" />
+    </g>
+  );
+}
+
+// Direction-aware Audi road car — flips to face travel direction
+function MovingCar({ path, duration, delay, color }: {
+  path: [number, number][]; duration: number; delay: number; color: string;
+}) {
   const totalLen = path.length - 1;
+  const [pos, setPos] = useState({
+    x: isoX(path[0][0], path[0][1]),
+    y: isoY(path[0][0], path[0][1], 0.06),
+    flip: false,
+  });
   useEffect(() => {
     let start: number | null = null;
     let frame: number;
@@ -218,13 +278,58 @@ function MovingCar({ path, duration, delay, color }: { path: [number, number][];
       const seg = Math.min(Math.floor(segT), totalLen - 1);
       const frac = segT - seg;
       const a = path[seg], b = path[Math.min(seg + 1, totalLen)];
-      setPos({ x: isoX(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac), y: isoY(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac, 0.05) });
+      const cx = isoX(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac);
+      const cy = isoY(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac, 0.06);
+      const nx = isoX(b[0], b[1]);
+      setPos({ x: cx, y: cy, flip: nx < cx });
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, []);
-  return <AudiCar cx={pos.x} cy={pos.y} color={color} />;
+  const sx = pos.flip ? -0.55 : 0.55;
+  return (
+    <g transform={`translate(${pos.x} ${pos.y}) scale(${sx} 0.55)`}>
+      <AudiCar color={color} />
+    </g>
+  );
+}
+
+// Direction-aware F1 car — flips to face travel direction (outer track only)
+function MovingF1Car({ path, duration, delay, color }: {
+  path: [number, number][]; duration: number; delay: number; color: string;
+}) {
+  const totalLen = path.length - 1;
+  const [pos, setPos] = useState({
+    x: isoX(path[0][0], path[0][1]),
+    y: isoY(path[0][0], path[0][1], 0.06),
+    flip: false,
+  });
+  useEffect(() => {
+    let start: number | null = null;
+    let frame: number;
+    const tick = (ts: number) => {
+      if (start === null) start = ts - delay * 1000;
+      const t = (((ts - start) / 1000 % duration) + duration) % duration / duration;
+      const segT = t * totalLen;
+      const seg = Math.min(Math.floor(segT), totalLen - 1);
+      const frac = segT - seg;
+      const a = path[seg], b = path[Math.min(seg + 1, totalLen)];
+      const cx = isoX(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac);
+      const cy = isoY(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac, 0.06);
+      const nx = isoX(b[0], b[1]);
+      setPos({ x: cx, y: cy, flip: nx < cx });
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const sx = pos.flip ? -0.6 : 0.6;
+  return (
+    <g transform={`translate(${pos.x} ${pos.y}) scale(${sx} 0.6)`}>
+      <F1Car color={color} />
+    </g>
+  );
 }
 
 function Person({ x, y, duration, delay }: { x: number; y: number; duration: number; delay: number }) {
@@ -421,6 +526,89 @@ function DeptCard({ dept, cardX, cardY, cardW, onClose, onApply }: {
   );
 }
 
+// ── Callout label layout — SVG viewBox coordinates (viewBox: 0 -55 1000 720)
+// Each entry: diagonal line from building anchor → viaX/Y (elbow), then horizontal → endX/Y (label)
+const LABEL_LAYOUT: Record<string, {
+  viaX: number; viaY: number;
+  endX: number; endY: number;
+  textAnchor: "start" | "end";
+}> = {
+  production: { viaX: 240, viaY: 218, endX: 95,  endY: 218, textAnchor: "end"   },
+  rnd:        { viaX: 700, viaY: 52,  endX: 930,  endY: 52,  textAnchor: "start" },
+  design:     { viaX: 750, viaY: 255, endX: 870,  endY: 255, textAnchor: "start" },
+  logistics:  { viaX: 145, viaY: 448, endX: 90,   endY: 448, textAnchor: "end"   },
+  sales:      { viaX: 380, viaY: 535, endX: 265,  endY: 535, textAnchor: "end"   },
+  digital:    { viaX: 790, viaY: 462, endX: 870,  endY: 462, textAnchor: "start" },
+};
+
+function CalloutLabel({
+  id, label, color,
+  fromX, fromY, viaX, viaY, endX, endY,
+  textAnchor, isActive, delay, onClick,
+}: {
+  id: string; label: string; color: string;
+  fromX: number; fromY: number;
+  viaX: number; viaY: number;
+  endX: number; endY: number;
+  textAnchor: "start" | "end";
+  isActive: boolean; delay: number;
+  onClick: (e: React.MouseEvent<SVGGElement>) => void;
+}) {
+  const PILL_H = 18;
+  const PILL_W = Math.max(label.length * 6 + 20, 38);
+  const pillX = textAnchor === "end" ? endX - PILL_W : endX;
+  const pillY = endY - PILL_H / 2;
+  const textX = textAnchor === "end" ? endX - 9 : endX + 9;
+  const lineColor = isActive ? color : "#BB0A21";
+
+  return (
+    <motion.g
+      data-testid={`callout-${id}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay, duration: 0.7 }}
+      style={{ cursor: "pointer" }}
+      onClick={onClick}
+    >
+      {/* Diagonal segment: building → elbow */}
+      <line
+        x1={fromX} y1={fromY} x2={viaX} y2={viaY}
+        stroke={lineColor} strokeWidth="1"
+        strokeOpacity={isActive ? 0.85 : 0.45}
+      />
+      {/* Horizontal stripe: elbow → label */}
+      <line
+        x1={viaX} y1={viaY} x2={endX} y2={endY}
+        stroke={lineColor} strokeWidth={isActive ? 2 : 1.5}
+        strokeOpacity={isActive ? 1 : 0.6}
+      />
+      {/* Dot at building anchor */}
+      <circle
+        cx={fromX} cy={fromY} r={isActive ? 4 : 3}
+        fill={lineColor} opacity={isActive ? 1 : 0.65}
+      />
+      {/* Label pill */}
+      <rect
+        x={pillX} y={pillY} width={PILL_W} height={PILL_H} rx={2}
+        fill={isActive ? color : "rgba(187,10,33,0.12)"}
+        stroke={lineColor} strokeWidth={1}
+        strokeOpacity={isActive ? 1 : 0.5}
+      />
+      <text
+        x={textX} y={endY + 4}
+        textAnchor={textAnchor}
+        fill={isActive ? "#fff" : "rgba(255,255,255,0.78)"}
+        fontSize="9"
+        fontFamily="'Inter', sans-serif"
+        letterSpacing="0.08em"
+        fontWeight="600"
+      >
+        {label.toUpperCase()}
+      </text>
+    </motion.g>
+  );
+}
+
 // ── Main scene ───────────────────────────────────────────────────
 export default function PlantScene() {
   const [activeDept, setActiveDept] = useState<string | null>(null);
@@ -450,7 +638,7 @@ export default function PlantScene() {
           src="/audi-logo.png"
           alt="Audi"
           width={110}
-          style={{ opacity: 0.92 }}
+          style={{ opacity: 0.92, filter: "brightness(0) invert(1)" }}
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 0.92, y: 0 }}
           transition={{ duration: 0.9, ease: "easeOut" }}
@@ -486,10 +674,14 @@ export default function PlantScene() {
       </motion.p>
 
       {/* SVG scene */}
-      <svg width="100%" height="100%" viewBox={`0 -55 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+      <svg width="100%" height="100%" viewBox={`0 -55 ${W} ${H}`} preserveAspectRatio="xMidYMid slice">
         <defs>
-          <filter id="bldShadow" x="-25%" y="-25%" width="150%" height="150%">
-            <feDropShadow dx="3" dy="6" stdDeviation="8" floodColor="#000" floodOpacity="0.6" />
+          <filter id="bldShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="2" dy="8" stdDeviation="10" floodColor="#000" floodOpacity="0.75" />
+          </filter>
+          <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
           <radialGradient id="glowRed" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#BB0A21" stopOpacity="0.25" />
@@ -503,15 +695,42 @@ export default function PlantScene() {
             <stop offset="0%" stopColor="#121128" />
             <stop offset="100%" stopColor="#0C0B1A" />
           </linearGradient>
+          <linearGradient id="trackGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1C1C36" />
+            <stop offset="100%" stopColor="#101020" />
+          </linearGradient>
         </defs>
 
-        {/* Ground */}
+        {/* Ground — slightly wider to cover track area */}
         <polygon fill="url(#ground)" points={[
-          [isoX(-3, -1.5), isoY(-3, -1.5)],
-          [isoX(7, -1.5), isoY(7, -1.5)],
-          [isoX(7, 5.5), isoY(7, 5.5)],
-          [isoX(-3, 5.5), isoY(-3, 5.5)],
+          [isoX(-5, -4), isoY(-5, -4)],
+          [isoX(9, -4), isoY(9, -4)],
+          [isoX(9, 9), isoY(9, 9)],
+          [isoX(-5, 9), isoY(-5, 9)],
         ].map(p => p.join(",")).join(" ")} />
+
+        {/* ── F1 circuit track ── rendered under buildings ── */}
+        {(() => {
+          const p = (closed = true) => {
+            const pts = F1_TRACK.map(([x, y]) => `${isoX(x, y)},${isoY(x, y, 0.03)}`);
+            return pts.join(" ");
+          };
+          const base = { fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+          return (
+            <g>
+              {/* Red rumble-strip glow */}
+              <polyline {...base} points={p()} stroke="rgba(187,10,33,0.25)" strokeWidth={40} />
+              {/* White edge markers */}
+              <polyline {...base} points={p()} stroke="rgba(255,255,255,0.45)" strokeWidth={32} />
+              {/* Asphalt main */}
+              <polyline {...base} points={p()} stroke="#101020" strokeWidth={28} />
+              {/* Asphalt surface (lighter) */}
+              <polyline {...base} points={p()} stroke="#181830" strokeWidth={22} />
+              {/* Centre dashed line */}
+              <polyline {...base} points={p()} stroke="rgba(255,220,40,0.3)" strokeWidth={1.5} strokeDasharray="12 9" />
+            </g>
+          );
+        })()}
 
         {/* Roads */}
         {([
@@ -531,62 +750,67 @@ export default function PlantScene() {
             points={pts.map(([px, py]) => `${isoX(px, py)},${isoY(px, py, 0.02)}`).join(" ")} />
         ))}
 
-        {/* Cars — rendered before buildings so buildings occlude them */}
+        {/* Road cars — inner factory roads */}
         <MovingCar path={loopRed}   duration={18} delay={0}  color="#7A1018" />
         <MovingCar path={loopBlue}  duration={22} delay={6}  color="#0E2E58" />
-        <MovingCar path={loopBlack} duration={14} delay={2}  color="#1A1828" />
+        {/* F1 car — outer circuit only */}
+        <MovingF1Car path={F1_TRACK} duration={28} delay={2} color="#BB0A21" />
 
-        {/* BUILDINGS — wider footprints, ~35% shorter than before */}
-        {/* 1 Production */}
+        {/* ── BUILDINGS ── dark futuristic palette ── */}
+        {/* 1 Production — deep blue-violet */}
         <g filter="url(#bldShadow)">
-          <Box x={-2.0} y={0.2} w={3.2} d={2.4} h={1.1} tc="#3A3860" lc="#12112A" rc="#252345" delay={0.1} />
-          <Box x={-1.6} y={0.4} w={2.4} d={2.0} h={1.7} tc="#46446E" lc="#18172E" rc="#302E50" delay={0.18} />
-          <Box x={-1.2} y={0.6} w={1.5} d={1.6} h={2.0} tc="#52508A" lc="#1C1A38" rc="#3A3870" delay={0.26} />
-          <Box x={-1.1} y={0.85} w={0.22} d={0.22} h={3.1} tc="#5A5878" lc="#1A1830" rc="#3C3A5C" delay={0.35} />
+          <Box x={-2.0} y={0.2} w={3.2} d={2.4} h={1.1} tc="#2A2848" lc="#0E0D24" rc="#1A1938" delay={0.1} />
+          <Box x={-1.6} y={0.4} w={2.4} d={2.0} h={1.7} tc="#3A3860" lc="#12112A" rc="#252345" delay={0.18} />
+          <Box x={-1.2} y={0.6} w={1.5} d={1.6} h={2.0} tc="#4A4878" lc="#16153A" rc="#302E60" delay={0.26} />
+          <Box x={-1.1} y={0.85} w={0.22} d={0.22} h={3.1} tc="#5A58A0" lc="#1A1850" rc="#403E80" delay={0.35} />
         </g>
-        {/* 2 R&D — still tallest but reduced */}
+        {/* 2 R&D — dark crimson (tallest) */}
         <g filter="url(#bldShadow)">
-          <Box x={0.3} y={0.15} w={1.5} d={1.0} h={2.2} tc="#5A1A38" lc="#20080E" rc="#3E1028" delay={0.14} />
-          <Box x={0.45} y={0.22} w={1.2} d={0.85} h={3.6} tc="#7A2448" lc="#2A0C18" rc="#521838" delay={0.22} />
-          <Box x={0.6} y={0.30} w={0.85} d={0.65} h={4.3} tc="#8A2A50" lc="#300E1C" rc="#5E1C40" delay={0.30} />
+          <Box x={0.3} y={0.15} w={1.5} d={1.0} h={2.2} tc="#4A1A38" lc="#200C18" rc="#381228" delay={0.14} />
+          <Box x={0.45} y={0.22} w={1.2} d={0.85} h={3.6} tc="#6A2248" lc="#2C0E20" rc="#501A38" delay={0.22} />
+          <Box x={0.6} y={0.30} w={0.85} d={0.65} h={4.3} tc="#8A2A50" lc="#3A1028" rc="#681E40" delay={0.30} />
           <line x1={isoX(1.02, 0.62)} y1={isoY(1.02, 0.62, 4.3)}
-            x2={isoX(1.02, 0.62)} y2={isoY(1.02, 0.62, 4.3) - 20}
-            stroke="#BB0A21" strokeWidth="2" opacity={0.85} />
-          <circle cx={isoX(1.02, 0.62)} cy={isoY(1.02, 0.62, 4.3) - 20} r={3}
+            x2={isoX(1.02, 0.62)} y2={isoY(1.02, 0.62, 4.3) - 22}
+            stroke="#BB0A21" strokeWidth="2" opacity={0.8} />
+          <circle cx={isoX(1.02, 0.62)} cy={isoY(1.02, 0.62, 4.3) - 22} r={3.5}
             fill="#BB0A21" opacity={0.9} />
+          <motion.circle cx={isoX(1.02, 0.62)} cy={isoY(1.02, 0.62, 4.3) - 22} r={8}
+            fill="none" stroke="#BB0A21" strokeWidth={1}
+            animate={{ r: [5, 12, 5], opacity: [0.6, 0, 0.6] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }} />
         </g>
-        {/* 3 Design */}
+        {/* 3 Design Studio — dark teal-blue */}
         <g filter="url(#bldShadow)">
-          <Box x={2.1} y={0.15} w={2.0} d={1.2} h={1.0} tc="#1A3A50" lc="#081422" rc="#102A3A" delay={0.2} />
-          <Box x={2.3} y={0.25} w={1.6} d={1.0} h={1.8} tc="#245070" lc="#0C1C2C" rc="#163850" delay={0.28} />
-          <Box x={2.55} y={0.35} w={1.1} d={0.8} h={2.4} tc="#2C6080" lc="#0E2030" rc="#1C4860" delay={0.36} />
+          <Box x={2.1} y={0.15} w={2.0} d={1.2} h={1.0} tc="#1A3A50" lc="#0C1E28" rc="#122A3A" delay={0.2} />
+          <Box x={2.3} y={0.25} w={1.6} d={1.0} h={1.8} tc="#245070" lc="#102838" rc="#183A52" delay={0.28} />
+          <Box x={2.55} y={0.35} w={1.1} d={0.8} h={2.4} tc="#2C6080" lc="#143040" rc="#1E4A60" delay={0.36} />
         </g>
-        {/* 4 Logistics */}
+        {/* 4 Logistics — dark navy */}
         <g filter="url(#bldShadow)">
-          <Box x={-2.0} y={3.0} w={4.0} d={1.2} h={0.8} tc="#202840" lc="#0A1018" rc="#161E2E" delay={0.24} />
-          <Box x={-1.7} y={3.05} w={3.4} d={1.1} h={1.3} tc="#2A3450" lc="#101826" rc="#1E2840" delay={0.32} />
-          <Box x={-0.6} y={4.0} w={1.2} d={0.6} h={0.6} tc="#1E2A3C" lc="#0C1420" rc="#14202E" delay={0.40} />
+          <Box x={-2.0} y={3.0} w={4.0} d={1.2} h={0.8} tc="#1E2640" lc="#0A0E1C" rc="#141828" delay={0.24} />
+          <Box x={-1.7} y={3.05} w={3.4} d={1.1} h={1.3} tc="#2A3450" lc="#0E1428" rc="#1A2038" delay={0.32} />
+          <Box x={-0.6} y={4.0} w={1.2} d={0.6} h={0.6} tc="#363050" lc="#161228" rc="#221E3C" delay={0.40} />
         </g>
-        {/* 5 Sales */}
+        {/* 5 Sales — dark maroon */}
         <g filter="url(#bldShadow)">
-          <Box x={1.9} y={2.0} w={1.5} d={1.2} h={1.4} tc="#4A1A30" lc="#1A0812" rc="#301020" delay={0.28} />
-          <Box x={2.05} y={2.1} w={1.2} d={1.0} h={2.2} tc="#601E3C" lc="#200A16" rc="#40142A" delay={0.36} />
+          <Box x={1.9} y={2.0} w={1.5} d={1.2} h={1.4} tc="#4A1A30" lc="#1E0A14" rc="#361218" delay={0.28} />
+          <Box x={2.05} y={2.1} w={1.2} d={1.0} h={2.2} tc="#601E3C" lc="#280C18" rc="#481428" delay={0.36} />
         </g>
-        {/* 6 Digital */}
+        {/* 6 Digital & IT — dark navy-blue */}
         <g filter="url(#bldShadow)">
-          <Box x={4.3} y={1.5} w={1.2} d={1.0} h={1.6} tc="#0E2A4A" lc="#04101E" rc="#081E36" delay={0.32} />
-          <Box x={4.45} y={1.6} w={0.95} d={0.82} h={2.6} tc="#143860" lc="#061426" rc="#0C2848" delay={0.40} />
-          <Box x={4.55} y={1.68} w={0.75} d={0.65} h={3.2} tc="#183C70" lc="#081A30" rc="#103060" delay={0.48} />
+          <Box x={4.3} y={1.5} w={1.2} d={1.0} h={1.6} tc="#0E2A4A" lc="#06101E" rc="#08183A" delay={0.32} />
+          <Box x={4.45} y={1.6} w={0.95} d={0.82} h={2.6} tc="#143860" lc="#081A30" rc="#0E2A50" delay={0.40} />
+          <Box x={4.55} y={1.68} w={0.75} d={0.65} h={3.2} tc="#183C70" lc="#0A1E38" rc="#102E5A" delay={0.48} />
         </g>
-        {/* 7 Pilothall */}
+        {/* 7 Pilothall — dark neutral */}
         <g filter="url(#bldShadow)">
-          <Box x={0.3} y={2.4} w={1.7} d={1.0} h={0.6} tc="#3A2416" lc="#16100A" rc="#281A10" delay={0.28} />
-          <Box x={0.45} y={2.48} w={1.4} d={0.85} h={1.0} tc="#4A2E1A" lc="#1C1208" rc="#341C12" delay={0.36} />
+          <Box x={0.3} y={2.4} w={1.7} d={1.0} h={0.6} tc="#282634" lc="#0E0D1A" rc="#181620" delay={0.28} />
+          <Box x={0.45} y={2.48} w={1.4} d={0.85} h={1.0} tc="#343240" lc="#141220" rc="#20202E" delay={0.36} />
         </g>
         {/* 8 Gatehouse */}
         <g filter="url(#bldShadow)">
-          <Box x={-0.35} y={-0.7} w={0.55} d={0.35} h={0.8} tc="#4A3860" lc="#1A1428" rc="#302448" delay={0.5} />
-          <Box x={0.28} y={-0.7} w={0.55} d={0.35} h={0.8} tc="#4A3860" lc="#1A1428" rc="#302448" delay={0.55} />
+          <Box x={-0.35} y={-0.7} w={0.55} d={0.35} h={0.8} tc="#1E1A30" lc="#0C0A18" rc="#161420" delay={0.5} />
+          <Box x={0.28} y={-0.7} w={0.55} d={0.35} h={0.8} tc="#1E1A30" lc="#0C0A18" rc="#161420" delay={0.55} />
         </g>
 
         {/* Windows */}
@@ -598,15 +822,15 @@ export default function PlantScene() {
 
         {/* Glow halos */}
         <motion.ellipse cx={isoX(1.02, 0.62)} cy={isoY(1.02, 0.62, 4.3)}
-          rx={55} ry={22} fill="url(#glowRed)"
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }} />
-        <motion.ellipse cx={isoX(4.9, 2.0)} cy={isoY(4.9, 2.0, 3.2)}
-          rx={45} ry={18} fill="url(#glowBlue)"
-          animate={{ opacity: [0.4, 0.9, 0.4] }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 1 }} />
+          rx={70} ry={28} fill="url(#glowRed)"
+          animate={{ opacity: [0.4, 0.8, 0.4] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }} />
+        <motion.ellipse cx={isoX(-0.8, 1.2)} cy={isoY(-0.8, 1.2, 0)}
+          rx={90} ry={36} fill="url(#glowBlue)"
+          animate={{ opacity: [0.3, 0.65, 0.3] }}
+          transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut", delay: 0.8 }} />
 
-        {/* Connecting lines */}
+        {/* Connecting lines — brighter */}
         {[
           { x1: -0.5, y1: 1.8, x2: 0.7, y2: 0.9, z: 0.12 },
           { x1: 1.4, y1: 0.6, x2: 2.5, y2: 0.6, z: 0.12 },
@@ -637,25 +861,29 @@ export default function PlantScene() {
         <Smoke x={-1.0} y={0.88} z={5.0} />
         <Smoke x={-0.95} y={0.82} z={4.9} />
 
-        {/* Department labels */}
-        {DEPARTMENTS.map(({ id, label, anchorX, anchorY, anchorZ, color }, i) => (
-          <motion.text key={id}
-            x={isoX(anchorX, anchorY)} y={isoY(anchorX, anchorY, anchorZ)}
-            textAnchor="middle"
-            fill={activeDept === id ? color : "rgba(255,255,255,0.6)"}
-            fontSize="11"
-            fontFamily="'Inter', sans-serif"
-            letterSpacing="0.1em"
-            fontWeight="500"
-            style={{ cursor: "pointer", transition: "fill 0.2s" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.2 + i * 0.1, duration: 0.7 }}
-            onClick={(e) => { e.stopPropagation(); setActiveDept(id === activeDept ? null : id); }}
-          >
-            {label.toUpperCase()}
-          </motion.text>
-        ))}
+        {/* Callout labels — leader lines pointing outward from each building */}
+        {DEPARTMENTS.map(({ id, label, anchorX, anchorY, anchorZ, color }, i) => {
+          const layout = LABEL_LAYOUT[id];
+          if (!layout) return null;
+          return (
+            <CalloutLabel
+              key={id}
+              id={id}
+              label={label}
+              color={color}
+              fromX={isoX(anchorX, anchorY)}
+              fromY={isoY(anchorX, anchorY, anchorZ)}
+              viaX={layout.viaX}
+              viaY={layout.viaY}
+              endX={layout.endX}
+              endY={layout.endY}
+              textAnchor={layout.textAnchor}
+              isActive={activeDept === id}
+              delay={1.2 + i * 0.1}
+              onClick={(e) => { e.stopPropagation(); setActiveDept(id === activeDept ? null : id); }}
+            />
+          );
+        })}
 
         {/* Clickable hit zones — fill must be non-"transparent" to receive pointer events */}
         {DEPARTMENTS.map(({ id, hitX, hitY, hitW, hitD, hitH, color }) => (
