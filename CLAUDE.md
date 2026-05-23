@@ -84,7 +84,24 @@ Express API Server (Port 8000)
 1. [dashboard.clerk.com](https://dashboard.clerk.com) → User → Edit public metadata → `{ "role": "superuser" }`
 2. Danach alle Rollen über `/admin` verwalten (ohne Clerk-Dashboard)
 
-**Rollenänderung wirkt erst nach erneutem Login** (Session-Claims werden gecacht).
+### ⚠️ Kritisch: Wie Rollen gelesen werden
+
+**Frontend:** Immer `useUser()` verwenden, NICHT `useAuth()`:
+```tsx
+const { user } = useUser();
+const role = user?.publicMetadata?.["role"] as string | undefined;
+```
+`useAuth()` → `sessionClaims` enthält `publicMetadata` NICHT (Clerk JWT-Template ohne publicMetadata).
+
+**Backend:** Immer Clerk API direkt aufrufen, NICHT JWT-Claims lesen:
+```typescript
+const { clerkClient } = await import("@clerk/express");
+const clerkUser = await clerkClient.users.getUser(userId);
+const role = clerkUser.publicMetadata?.["role"] as string | undefined;
+```
+Sync-Hilfsfunktionen wie `isAudiStaff(req)` die JWT-Claims lesen → immer falsch, da JWT kein publicMetadata enthält.
+
+**Rollenänderung wirkt sofort** (kein Re-Login nötig, da wir direkt Clerk API lesen, nicht JWT-Cache).
 
 ---
 
@@ -105,6 +122,25 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...   # Nur Publishable Key
 ```
 
 **Dev ohne Clerk:** Wenn Keys fehlen/`REPLACE_ME`, deaktiviert Backend Auth transparent (`CLERK_ENABLED = false`). Alle Routen offen.
+
+---
+
+## Produktion (Docker auf Strato VPS)
+
+Server läuft unter **http://85.215.132.195** (HTTP-only, noch keine Domain/SSL).
+
+```bash
+# Lokale Entwicklung → committen → pushen
+git push origin main
+
+# Auf Server deployen (SSH: root@85.215.132.195)
+cd ~/audi-innovation-hub
+git pull
+docker compose --env-file .env.production build
+docker compose --env-file .env.production up -d
+```
+
+Vollständige Doku: siehe **DEPLOYMENT.md**
 
 ---
 
@@ -130,7 +166,7 @@ cd lib/api-client-react && npx tsc --build
 - **esbuild Override `0.27.3`** — wegen Drizzle-Kit, nicht ändern
 - **Port 5000** belegt auf macOS (AirPlay) → API auf Port 8000
 - **JSONB-Felder** (`departmentScores`, `requirements` etc.) immer casten
-- **clerkClient()** aus `@clerk/express` als Funktion aufrufen, nicht als Objekt
+- **clerkClient** aus `@clerk/express` ist ein **direktes Objekt** (KEIN Funktionsaufruf!) — `clerkClient.users.getUser(userId)` direkt aufrufen, NICHT `clerkClient()` oder `(clerkClient as any)()`
 - **Wouter `routing="hash"`** in SignIn/SignUp — Clerk navigiert intern zu Sub-Paths
 
 ---

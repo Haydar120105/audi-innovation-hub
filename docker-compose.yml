@@ -26,15 +26,12 @@ services:
         # Use your live key (pk_live_...) for production.
         VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
+    # Coolify's Traefik proxy handles ports 80/443 — nginx only exposes internally
+    expose:
+      - "80"
     volumes:
       # nginx config (mounted, not baked — allows hot-swap without rebuild)
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      # Let's Encrypt certificates (managed by certbot service below)
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
+      - ./docker/nginx-init.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       api:
         condition: service_healthy
