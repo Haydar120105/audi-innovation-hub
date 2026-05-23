@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { UserButton, useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useListApplications } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 
 const AUDI_RED = "#BB0A21";
@@ -96,6 +97,16 @@ export default function AdminDashboard() {
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
+  // ── Applications overview (superuser can see all) ──────────────────────────
+  const { data: apps = [] } = useListApplications();
+  const appStats = {
+    total:       apps.length,
+    pending:     apps.filter(a => a.status === "pending" || a.status === "routed").length,
+    shortlisted: apps.filter(a => a.status === "shortlisted").length,
+    accepted:    apps.filter(a => a.status === "accepted").length,
+    declined:    apps.filter(a => a.status === "declined" || a.status === "archived").length,
+  };
+
   const { data: users = [], isLoading, error } = useQuery<ClerkUser[]>({
     queryKey: ["admin-users"],
     queryFn: async () => {
@@ -163,27 +174,160 @@ export default function AdminDashboard() {
             </span>
           </span>
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Link href="/applications">
-            <button className="px-4 py-2 text-xs font-semibold rounded-sm transition-all"
-              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all hidden sm:inline-flex items-center gap-1.5"
+              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: "1px solid rgba(255,255,255,0.09)" }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1.5 3h9M1.5 6h9M1.5 9h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
               Applications
             </button>
           </Link>
+          <Link href="/departments">
+            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all hidden sm:inline-flex items-center gap-1.5"
+              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: "1px solid rgba(255,255,255,0.09)" }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1L10.5 3.5v5L6 11 1.5 8.5v-5L6 1z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Departments
+            </button>
+          </Link>
+          <span className="px-2.5 py-1 text-[10px] font-semibold rounded-sm hidden sm:inline"
+            style={{ color: "rgba(245,158,11,0.85)", border: "1px solid rgba(245,158,11,0.22)", background: "rgba(245,158,11,0.07)" }}>
+            Superuser ⚡
+          </span>
           <UserButton afterSignOutUrl="/" />
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-6 pt-24 pb-20">
-        {/* Header */}
-        <div className="mb-10">
-          <p className="text-xs tracking-[0.25em] font-semibold uppercase mb-2" style={{ color: "#f59e0b" }}>
-            Superuser
+        {/* ── Command Center Header ── */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55 }}
+          className="mb-10"
+        >
+          <p className="text-[11px] tracking-[0.28em] font-semibold uppercase mb-2" style={{ color: "#f59e0b" }}>
+            Superuser · Command Center
           </p>
-          <h1 className="text-3xl md:text-4xl font-light text-white">
-            User <span className="font-semibold">Management</span>
+          <h1 className="text-3xl md:text-4xl font-light text-white leading-tight">
+            Innovation Hub <span className="font-semibold">Overview</span>
           </h1>
-          <p className="text-white/30 text-sm mt-1">Assign and manage roles for all users in the system.</p>
+          <p className="text-white/30 text-sm mt-2">
+            Vollständiger Systemüberblick — Bewerbungen, Departments und Nutzerverwaltung.
+          </p>
+        </motion.div>
+
+        {/* ── Application Stats Strip ── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.5 }}
+          className="mb-3"
+        >
+          <p className="text-[10px] tracking-[0.2em] font-semibold uppercase text-white/25 mb-3">Bewerbungen</p>
+          <div className="grid grid-cols-5 gap-2 mb-8">
+            {[
+              { label: "Gesamt",       value: appStats.total,       color: "rgba(255,255,255,0.7)" },
+              { label: "In Prüfung",   value: appStats.pending,     color: "#d97706" },
+              { label: "Shortlisted",  value: appStats.shortlisted, color: "#8b5cf6" },
+              { label: "Akzeptiert",   value: appStats.accepted,    color: "#16a34a" },
+              { label: "Abgelehnt",    value: appStats.declined,    color: "#6b7280" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="p-4 rounded-sm text-center"
+                style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <p className="text-2xl font-light mb-0.5" style={{ color }}>{value}</p>
+                <p className="text-white/30 text-[10px] tracking-[0.1em] uppercase">{label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* ── Quick Action Cards ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.5 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-10"
+        >
+          {/* Applications */}
+          <Link href="/applications">
+            <div className="group p-5 rounded-sm cursor-pointer transition-all hover:border-white/15"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-9 h-9 rounded-sm flex items-center justify-center"
+                  style={{ background: "rgba(187,10,33,0.12)", border: "1px solid rgba(187,10,33,0.2)" }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M2 4h12M2 8h12M2 12h7" stroke={AUDI_RED} strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mt-1 opacity-30 group-hover:opacity-60 transition-opacity">
+                  <path d="M3 7h8M8 4l3 3-3 3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p className="text-white font-semibold text-sm mb-1">Alle Bewerbungen</p>
+              <p className="text-white/35 text-xs leading-relaxed">
+                {appStats.total} Bewerbungen · {appStats.pending} ausstehend
+              </p>
+              <div className="mt-3 h-px w-full" style={{ background: `linear-gradient(90deg, ${AUDI_RED}44, transparent)` }} />
+            </div>
+          </Link>
+
+          {/* Department Portal */}
+          <Link href="/departments">
+            <div className="group p-5 rounded-sm cursor-pointer transition-all hover:border-white/15"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-9 h-9 rounded-sm flex items-center justify-center"
+                  style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)" }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1.5L13.5 4.5v7L8 14.5 2.5 11.5v-7L8 1.5z" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="8" cy="8" r="2" stroke="#3b82f6" strokeWidth="1.2"/>
+                  </svg>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mt-1 opacity-30 group-hover:opacity-60 transition-opacity">
+                  <path d="M3 7h8M8 4l3 3-3 3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p className="text-white font-semibold text-sm mb-1">Department Portal</p>
+              <p className="text-white/35 text-xs leading-relaxed">
+                6 Departments · R&D, Design, Produktion …
+              </p>
+              <div className="mt-3 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(59,130,246,0.4), transparent)" }} />
+            </div>
+          </Link>
+
+          {/* User Management anchor */}
+          <a href="#user-management">
+            <div className="group p-5 rounded-sm cursor-pointer transition-all hover:border-white/15"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-9 h-9 rounded-sm flex items-center justify-center"
+                  style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.22)" }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="6" cy="5" r="2.5" stroke="#f59e0b" strokeWidth="1.5"/>
+                    <path d="M1 13c0-2.2 2-4 5-4s5 1.8 5 4" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M11.5 7.5l1.5 1.5 2.5-2.5" stroke="#f59e0b" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mt-1 opacity-30 group-hover:opacity-60 transition-opacity">
+                  <path d="M7 3v8M4 8l3 3 3-3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p className="text-white font-semibold text-sm mb-1">User Management</p>
+              <p className="text-white/35 text-xs leading-relaxed">
+                {stats.total} Nutzer · {stats.staff} Staff · {stats.superuser} Superuser
+              </p>
+              <div className="mt-3 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(245,158,11,0.4), transparent)" }} />
+            </div>
+          </a>
+        </motion.div>
+
+        {/* User Management section anchor */}
+        <div id="user-management" className="mb-6 pt-2">
+          <p className="text-[10px] tracking-[0.2em] font-semibold uppercase text-white/25 mb-4">Nutzerverwaltung</p>
         </div>
 
         {/* Role legend */}

@@ -8,7 +8,7 @@ export default function SignInPage() {
     >
       <SignIn
         routing="hash"
-        afterSignInUrl="/"
+        afterSignInUrl="/dashboard"
         appearance={{
           variables: {
             colorPrimary: "#BB0A21",
