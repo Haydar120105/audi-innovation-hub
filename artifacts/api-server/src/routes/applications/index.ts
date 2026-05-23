@@ -65,9 +65,17 @@ router.post("/applications", requireAuth, async (req, res): Promise<void> => {
   }
 });
 
-// GET /applications — audi_staff sees all; applicants see only their own
+// GET /applications — audi_staff/superuser sees all; applicants see only their own
 router.get("/applications", requireAuth, async (req, res): Promise<void> => {
-  if (isAudiStaff(req)) {
+  const userId = getUserId(req)!;
+
+  // Check role via Clerk API (fresh — JWT claims don't include publicMetadata by default)
+  const { clerkClient } = await import("@clerk/express");
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const role = clerkUser.publicMetadata?.["role"] as string | undefined;
+  const isStaffOrAdmin = role === "audi_staff" || role === "superuser";
+
+  if (isStaffOrAdmin) {
     const apps = await db
       .select()
       .from(applicationsTable)
@@ -77,7 +85,6 @@ router.get("/applications", requireAuth, async (req, res): Promise<void> => {
   }
 
   // Applicant: only their own submissions
-  const userId = getUserId(req)!;
   const apps = await db
     .select()
     .from(applicationsTable)
@@ -131,7 +138,11 @@ router.get("/applications/:id", requireAuth, async (req, res): Promise<void> => 
   }
 
   // Non-staff can only see their own application
-  if (!isAudiStaff(req) && app.clerkUserId !== getUserId(req)) {
+  const ownerId = getUserId(req);
+  const { clerkClient } = await import("@clerk/express");
+  const clerkUser = await clerkClient.users.getUser(ownerId!);
+  const role = clerkUser.publicMetadata?.["role"] as string | undefined;
+  if (role !== "audi_staff" && role !== "superuser" && app.clerkUserId !== ownerId) {
     res.status(403).json({ error: "Access denied." });
     return;
   }

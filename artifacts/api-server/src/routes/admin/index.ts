@@ -13,11 +13,8 @@ router.get("/admin/users", requireSuperuser, async (_req, res): Promise<void> =>
   }
 
   const { clerkClient } = await import("@clerk/express");
-  // clerkClient() returns the client instance
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = await (clerkClient as any)();
 
-  const response = await client.users.getUserList({ limit: 500, orderBy: "-created_at" });
+  const response = await clerkClient.users.getUserList({ limit: 500, orderBy: "-created_at" });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const users = response.data.map((u: any) => ({
@@ -50,12 +47,10 @@ router.patch("/admin/users/:userId/role", requireSuperuser, async (req, res): Pr
   }
 
   const { clerkClient } = await import("@clerk/express");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = await (clerkClient as any)();
 
   const newRole = role || null;
 
-  await client.users.updateUserMetadata(userId, {
+  await clerkClient.users.updateUserMetadata(userId, {
     publicMetadata: { role: newRole },
   });
 
@@ -72,10 +67,8 @@ router.delete("/admin/users/:userId", requireSuperuser, async (req, res): Promis
   }
 
   const { clerkClient } = await import("@clerk/express");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = await (clerkClient as any)();
 
-  await client.users.deleteUser(userId);
+  await clerkClient.users.deleteUser(userId);
   res.json({ ok: true, userId });
 });
 
