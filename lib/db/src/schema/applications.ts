@@ -43,6 +43,9 @@ export const applicationsTable = pgTable("applications", {
   requirements: jsonb("requirements"), // [{id,text,done}]
   milestones: jsonb("milestones"),    // [{id,title,dueDate,status}]
   kpis: jsonb("kpis"),               // [{id,metric,target,current,unit}]
+  // Onboarding fields (set when accepted)
+  assignedEmployee: jsonb("assigned_employee"), // { name, role, email, department }
+  ndaStatus: text("nda_status"),               // 'pending_signature' | 'signed'
 });
 
 export const insertApplicationSchema = createInsertSchema(applicationsTable).omit({
