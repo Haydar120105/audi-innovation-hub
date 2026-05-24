@@ -172,6 +172,8 @@ router.patch("/applications/:id", requireAudiStaff, async (req, res): Promise<vo
   if (body.data.requirements !== undefined) updates.requirements = body.data.requirements;
   if (body.data.milestones !== undefined) updates.milestones = body.data.milestones;
   if (body.data.kpis !== undefined) updates.kpis = body.data.kpis;
+  if (body.data.assignedEmployee !== undefined) updates.assignedEmployee = body.data.assignedEmployee;
+  if (body.data.ndaStatus !== undefined) updates.ndaStatus = body.data.ndaStatus;
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No fields to update" });

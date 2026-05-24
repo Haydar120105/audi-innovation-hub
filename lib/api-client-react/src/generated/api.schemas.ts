@@ -121,6 +121,8 @@ export interface Application {
   requirements?: RequirementItem[] | null;
   milestones?: MilestoneItem[] | null;
   kpis?: KpiItem[] | null;
+  assignedEmployee?: AssignedEmployee | null;
+  ndaStatus?: string | null;
 }
 
 export interface ApplicationTracking {

@@ -543,7 +543,7 @@ function StaffPanel({
   app,
   onSave,
 }: {
-  app: { status: string; rating?: number | null; notes?: string | null; nextStep?: string | null; requirements?: RequirementItem[] | null; milestones?: MilestoneItem[] | null; kpis?: KpiItem[] | null };
+  app: { status: string; rating?: number | null; notes?: string | null; nextStep?: string | null; requirements?: RequirementItem[] | null; milestones?: MilestoneItem[] | null; kpis?: KpiItem[] | null; assignedEmployee?: { name: string; role: string; email: string; department: string } | null; ndaStatus?: string | null };
   onSave: (data: Record<string, unknown>) => void;
 }) {
   const [status, setStatus] = useState(app.status);
@@ -555,10 +555,20 @@ function StaffPanel({
   const [kpis, setKpis] = useState<KpiItem[]>(app.kpis ?? []);
   const [saved, setSaved] = useState(false);
 
+  // Onboarding fields
+  const [empName, setEmpName] = useState(app.assignedEmployee?.name ?? "");
+  const [empRole, setEmpRole] = useState(app.assignedEmployee?.role ?? "");
+  const [empEmail, setEmpEmail] = useState(app.assignedEmployee?.email ?? "");
+  const [empDept, setEmpDept] = useState(app.assignedEmployee?.department ?? "");
+  const [ndaStatus, setNdaStatus] = useState<string>(app.ndaStatus ?? "pending_signature");
+
   const triggerSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
 
   const handleSave = () => {
-    onSave({ status, rating: rating || null, notes, nextStep, requirements: reqs, milestones, kpis });
+    const assignedEmployee = empName && empRole && empEmail && empDept
+      ? { name: empName, role: empRole, email: empEmail, department: empDept }
+      : null;
+    onSave({ status, rating: rating || null, notes, nextStep, requirements: reqs, milestones, kpis, assignedEmployee, ndaStatus: ndaStatus || null });
     triggerSaved();
   };
 
@@ -639,6 +649,72 @@ function StaffPanel({
           </div>
         </div>
       </div>
+
+      {/* Onboarding — only shown when accepted */}
+      {status === "accepted" && (
+        <div className="rounded-sm overflow-hidden" style={{ border: "1px solid rgba(22,163,74,0.25)", background: "rgba(22,163,74,0.04)" }}>
+          <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: "1px solid rgba(22,163,74,0.12)" }}>
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#16a34a" }} />
+            <p className="text-xs font-semibold" style={{ color: "#16a34a" }}>Onboarding Bundle — visible to applicant</p>
+          </div>
+          <div className="p-5 space-y-4">
+            {/* NDA Status */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-2">NDA Status</p>
+              <div className="flex gap-2">
+                {["pending_signature", "signed"].map(val => (
+                  <button
+                    key={val}
+                    onClick={() => setNdaStatus(val)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all"
+                    style={{
+                      background: ndaStatus === val ? (val === "signed" ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.08)") : "rgba(255,255,255,0.03)",
+                      color: ndaStatus === val ? (val === "signed" ? "#16a34a" : "rgba(255,255,255,0.7)") : "rgba(255,255,255,0.3)",
+                      border: `1px solid ${ndaStatus === val ? (val === "signed" ? "rgba(22,163,74,0.3)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.07)"}`,
+                    }}
+                  >
+                    {val === "signed" ? "✓ Signed" : "Pending signature"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Assigned Employee */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-3">Assigned Audi Employee</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Full name", value: empName, setter: setEmpName, placeholder: "e.g. Anna Müller" },
+                  { label: "Role / Title", value: empRole, setter: setEmpRole, placeholder: "e.g. Innovation Manager" },
+                  { label: "Email", value: empEmail, setter: setEmpEmail, placeholder: "e.g. a.mueller@audi.de" },
+                  { label: "Department", value: empDept, setter: setEmpDept, placeholder: "e.g. R&D Partnerships" },
+                ].map(({ label, value, setter, placeholder }) => (
+                  <div key={label}>
+                    <p className="text-white/25 text-[10px] font-semibold uppercase tracking-wide mb-1">{label}</p>
+                    <input
+                      value={value}
+                      onChange={e => setter(e.target.value)}
+                      placeholder={placeholder}
+                      className="w-full px-3 py-2 rounded-sm text-sm text-white placeholder-white/20 outline-none"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+                    />
+                  </div>
+                ))}
+              </div>
+              {(empName || empEmail) && (
+                <div className="mt-3 flex items-center gap-3 px-4 py-3 rounded-sm" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "rgba(187,10,33,0.15)", color: AUDI_RED }}>
+                    {empName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                  </div>
+                  <div>
+                    <p className="text-white text-xs font-semibold">{empName || "—"}</p>
+                    <p className="text-white/35 text-[10px]">{empRole || "—"} · {empDept || "—"}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notes */}
       <div className="p-5 rounded-sm" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
