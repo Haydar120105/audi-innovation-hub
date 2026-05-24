@@ -59,7 +59,7 @@ function TopRightNav() {
           {/* Single Dashboard button — routes to role-specific view */}
           <Link href={dashboardHref}>
             <button
-              className="px-3 py-1.5 text-xs font-semibold rounded-sm hidden sm:inline-flex items-center gap-1.5 transition-opacity hover:opacity-80"
+              className="px-3 py-1.5 text-xs font-semibold rounded-sm hidden sm:inline-flex items-center gap-1.5 transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
               style={dashboardStyle}
             >
               Dashboard
@@ -72,7 +72,7 @@ function TopRightNav() {
         <>
           <Link href="/sign-in">
             <button
-              className="px-4 py-2 text-xs font-semibold rounded-sm transition-opacity hover:opacity-80"
+              className="px-4 py-2 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
               style={ghost}
             >
               Log in
@@ -80,7 +80,7 @@ function TopRightNav() {
           </Link>
           <Link href="/sign-up">
             <button
-              className="px-4 py-2 text-xs font-semibold rounded-sm text-white transition-opacity hover:opacity-85"
+              className="px-4 py-2 text-xs font-semibold rounded-sm text-white transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
               style={{ background: "#BB0A21" }}
             >
               Register

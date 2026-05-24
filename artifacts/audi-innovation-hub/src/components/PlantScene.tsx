@@ -65,9 +65,9 @@ function Box({ x, y, z = 0, w, d, h, tc, lc, rc, delay = 0 }: BoxProps) {
   const oy = isoY(x + w / 2, y + d / 2, z);
   return (
     <motion.g
-      initial={{ opacity: 0, scaleY: 0 }}
+      initial={{ opacity: 0, scaleY: 0.88 }}
       animate={{ opacity: 1, scaleY: 1 }}
-      transition={{ delay, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ delay, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       style={{ transformOrigin: `${ox}px ${oy}px` }}
     >
       <polygon points={f.right} fill={rc} />

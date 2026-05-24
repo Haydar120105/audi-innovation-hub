@@ -194,7 +194,7 @@ export default function Testimonials() {
               <motion.div
                 key={p.name}
                 {...fadeUp(0.05 + i * 0.05)}
-                className="group flex flex-col items-center justify-center gap-2 py-7 px-4 rounded-sm transition-all duration-300"
+                className="group flex flex-col items-center justify-center gap-2 py-7 px-4 rounded-sm"
                 style={{
                   background: "rgba(255,255,255,0.02)",
                   border: "1px solid rgba(255,255,255,0.06)",
@@ -202,6 +202,7 @@ export default function Testimonials() {
                 whileHover={{
                   background: "rgba(255,255,255,0.045)",
                   borderColor: "rgba(255,255,255,0.12)",
+                  transition: { duration: 0.18 },
                 }}
               >
                 {/* Wordmark placeholder — replace with <img> when real logos are available */}

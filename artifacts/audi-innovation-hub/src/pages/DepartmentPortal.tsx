@@ -130,7 +130,7 @@ function ScoreBar({ score }: { score: number }) {
         className="flex-1 h-1 rounded-full"
         style={{ background: "rgba(255,255,255,0.08)" }}>
         <div
-          className="h-full rounded-full transition-all duration-700"
+          className="h-full rounded-full transition-[width] duration-700"
           style={{
             width: `${score}%`,
             background:
@@ -293,7 +293,7 @@ function ApplicationRow({
         />
         <button
           onClick={() => setNotesOpen((v) => !v)}
-          className="px-3 py-1.5 text-xs font-semibold rounded transition-all ml-auto"
+          className="px-3 py-1.5 text-xs font-semibold rounded transition-[background-color,transform] duration-150 active:scale-[0.97] ml-auto"
           style={{
             background: notesOpen
               ? "rgba(255,255,255,0.1)"
@@ -360,7 +360,7 @@ function ActionButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="px-3 py-1.5 text-xs font-semibold rounded transition-all disabled:opacity-50"
+      className="px-3 py-1.5 text-xs font-semibold rounded transition-[background-color,color,border-color,transform] duration-150 disabled:opacity-50 active:scale-[0.97]"
       style={{
         background: active ? `${color}33` : "rgba(255,255,255,0.05)",
         color: active ? color : "rgba(255,255,255,0.45)",
@@ -435,7 +435,7 @@ export function DepartmentsList() {
             return (
               <Link key={dept.id} href={`/departments/${dept.id}`}>
                 <div
-                  className="group p-6 rounded-sm cursor-pointer transition-all hover:border-white/15"
+                  className="group p-6 rounded-sm cursor-pointer transition-[border-color,background-color] duration-200 hover:border-white/15"
                   style={{
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(255,255,255,0.07)",

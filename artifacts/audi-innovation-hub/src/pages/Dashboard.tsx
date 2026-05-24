@@ -84,7 +84,7 @@ function PipelineBar({ status }: { status: string }) {
           <div key={step.key} className="flex items-center" style={{ flex: last ? "0 0 auto" : 1 }}>
             <div className="flex flex-col items-center gap-1.5">
               <div
-                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500"
+                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-[background-color,border-color,box-shadow] duration-500"
                 style={{
                   background: declined ? "rgba(255,255,255,0.04)" : done ? AUDI_RED : "rgba(255,255,255,0.06)",
                   border: `2px solid ${declined ? "rgba(255,255,255,0.08)" : done ? AUDI_RED : "rgba(255,255,255,0.1)"}`,
@@ -106,7 +106,7 @@ function PipelineBar({ status }: { status: string }) {
             </div>
             {!last && (
               <div
-                className="flex-1 h-px mx-2 mb-4 transition-all duration-500"
+                className="flex-1 h-px mx-2 mb-4 transition-colors duration-500"
                 style={{ background: declined ? "rgba(255,255,255,0.05)" : activeIdx > i ? AUDI_RED : "rgba(255,255,255,0.07)" }}
               />
             )}
@@ -377,7 +377,7 @@ function EmptyState() {
       </p>
       <Link href="/apply">
         <button
-          className="px-6 py-2.5 text-sm font-semibold text-white rounded-sm transition-opacity hover:opacity-85"
+          className="px-6 py-2.5 text-sm font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
           style={{ background: AUDI_RED }}
         >
           Apply now
@@ -424,7 +424,7 @@ export default function ApplicantDashboard() {
           )}
           {hasApps && (
             <Link href="/apply">
-              <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm hover:opacity-85 transition-opacity" style={{ background: AUDI_RED }}>
+              <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]" style={{ background: AUDI_RED }}>
                 + New application
               </button>
             </Link>

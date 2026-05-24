@@ -64,7 +64,7 @@ function ScoreBar({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-        <div className="h-full rounded-full transition-all duration-700"
+        <div className="h-full rounded-full transition-[width] duration-700"
           style={{
             width: `${score}%`,
             background: score >= 70 ? AUDI_RED : score >= 40 ? "#d97706" : "rgba(255,255,255,0.2)",
@@ -121,13 +121,13 @@ export function ApplicationsList() {
         </Link>
         <div className="flex items-center gap-3">
           <Link href="/departments">
-            <button className="px-4 py-2 text-xs font-semibold rounded-sm transition-all"
+            <button className="px-4 py-2 text-xs font-semibold rounded-sm transition-[background-color,border-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
               style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}>
               Departments
             </button>
           </Link>
           <Link href="/apply">
-            <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-opacity hover:opacity-85"
+            <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
               style={{ background: AUDI_RED }}>
               + New Application
             </button>
@@ -160,7 +160,7 @@ export function ApplicationsList() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className="p-4 rounded-sm text-left transition-all"
+              className="p-4 rounded-sm text-left transition-[background-color,border-color,transform] duration-200 active:scale-[0.98]"
               style={{
                 background: filter === f ? "rgba(187,10,33,0.1)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${filter === f ? `${AUDI_RED}44` : "rgba(255,255,255,0.07)"}`,
@@ -178,7 +178,7 @@ export function ApplicationsList() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by company or stage…"
-            className="flex-1 px-4 py-2.5 rounded-sm text-sm text-white placeholder-white/25 outline-none transition-all"
+            className="flex-1 px-4 py-2.5 rounded-sm text-sm text-white placeholder-white/25 outline-none transition-[border-color] duration-150"
             style={{
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.09)",
@@ -189,7 +189,7 @@ export function ApplicationsList() {
               <button
                 key={s}
                 onClick={() => setFilter(s)}
-                className="px-3 py-2 text-xs font-semibold rounded-sm capitalize transition-all"
+                className="px-3 py-2 text-xs font-semibold rounded-sm capitalize transition-[background-color,color,border-color,transform] duration-150 active:scale-[0.97]"
                 style={{
                   background: filter === s ? AUDI_RED : "rgba(255,255,255,0.05)",
                   color: filter === s ? "#fff" : "rgba(255,255,255,0.45)",
@@ -266,7 +266,7 @@ function AppRow({ app, odd }: { app: ApplicationSummary; odd: boolean }) {
   return (
     <Link href={`/applications/${app.id}`}>
       <div
-        className="grid grid-cols-12 gap-4 px-5 py-4 cursor-pointer transition-all group items-center"
+        className="grid grid-cols-12 gap-4 px-5 py-4 cursor-pointer transition-colors duration-150 group items-center hover:bg-white/[0.02]"
         style={{
           background: odd ? "rgba(255,255,255,0.015)" : "transparent",
           borderBottom: "1px solid rgba(255,255,255,0.04)",
@@ -525,7 +525,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
-      className="px-3 py-1.5 text-xs font-semibold rounded transition-all"
+      className="px-3 py-1.5 text-xs font-semibold rounded transition-[background-color,color,border-color] duration-200"
       style={{
         background: copied ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.08)",
         color: copied ? "#16a34a" : "rgba(255,255,255,0.5)",
@@ -605,7 +605,7 @@ function StaffPanel({
         </div>
         <button
           onClick={handleSave}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-sm transition-all"
+          className="px-5 py-2 text-sm font-semibold text-white rounded-sm transition-[background-color,transform] duration-200 active:scale-[0.97]"
           style={{ background: saved ? "#16a34a" : AUDI_RED }}
         >
           {saved ? "✓ Saved" : "Save Changes"}
@@ -666,7 +666,7 @@ function StaffPanel({
                   <button
                     key={val}
                     onClick={() => setNdaStatus(val)}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[background-color,color,border-color] duration-200 active:scale-[0.97]"
                     style={{
                       background: ndaStatus === val ? (val === "signed" ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.08)") : "rgba(255,255,255,0.03)",
                       color: ndaStatus === val ? (val === "signed" ? "#16a34a" : "rgba(255,255,255,0.7)") : "rgba(255,255,255,0.3)",
@@ -746,7 +746,7 @@ function StaffPanel({
         <div className="flex items-center justify-between mb-4">
           <p className="text-white/30 text-xs font-semibold uppercase tracking-wide">Requirements</p>
           <button onClick={addReq}
-            className="px-3 py-1 text-xs font-semibold rounded-sm transition-all"
+            className="px-3 py-1 text-xs font-semibold rounded-sm transition-[background-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
             style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}>
             + Add
           </button>
@@ -756,7 +756,7 @@ function StaffPanel({
           {reqs.map(req => (
             <div key={req.id} className="flex items-center gap-3">
               <button onClick={() => toggleReq(req.id)} className="flex-shrink-0">
-                <div className="w-4 h-4 rounded-sm flex items-center justify-center transition-all"
+                <div className="w-4 h-4 rounded-sm flex items-center justify-center transition-[background-color,border-color] duration-150"
                   style={{ background: req.done ? AUDI_RED : "transparent", border: `1.5px solid ${req.done ? AUDI_RED : "rgba(255,255,255,0.2)"}` }}>
                   {req.done && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 </div>
@@ -786,7 +786,7 @@ function StaffPanel({
         <div className="flex items-center justify-between mb-4">
           <p className="text-white/30 text-xs font-semibold uppercase tracking-wide">Milestones</p>
           <button onClick={addMs}
-            className="px-3 py-1 text-xs font-semibold rounded-sm transition-all"
+            className="px-3 py-1 text-xs font-semibold rounded-sm transition-[background-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
             style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}>
             + Add
           </button>
@@ -829,7 +829,7 @@ function StaffPanel({
         <div className="flex items-center justify-between mb-4">
           <p className="text-white/30 text-xs font-semibold uppercase tracking-wide">KPIs</p>
           <button onClick={addKpi}
-            className="px-3 py-1 text-xs font-semibold rounded-sm transition-all"
+            className="px-3 py-1 text-xs font-semibold rounded-sm transition-[background-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
             style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}>
             + Add KPI
           </button>
@@ -878,7 +878,7 @@ function StaffPanel({
       <div className="flex justify-end pt-2">
         <button
           onClick={handleSave}
-          className="px-7 py-3 text-sm font-semibold text-white rounded-sm transition-all"
+          className="px-7 py-3 text-sm font-semibold text-white rounded-sm transition-[background-color,transform] duration-200 active:scale-[0.97]"
           style={{ background: saved ? "#16a34a" : AUDI_RED }}
         >
           {saved ? "✓ Changes Saved" : "Save All Changes"}

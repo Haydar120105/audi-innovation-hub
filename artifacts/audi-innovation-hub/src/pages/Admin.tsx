@@ -176,7 +176,7 @@ export default function AdminDashboard() {
         </Link>
         <div className="flex items-center gap-2">
           <Link href="/applications">
-            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all hidden sm:inline-flex items-center gap-1.5"
+            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97] hidden sm:inline-flex items-center gap-1.5"
               style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: "1px solid rgba(255,255,255,0.09)" }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M1.5 3h9M1.5 6h9M1.5 9h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
             </button>
           </Link>
           <Link href="/departments">
-            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all hidden sm:inline-flex items-center gap-1.5"
+            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97] hidden sm:inline-flex items-center gap-1.5"
               style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: "1px solid rgba(255,255,255,0.09)" }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1L10.5 3.5v5L6 11 1.5 8.5v-5L6 1z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
         >
           {/* Applications */}
           <Link href="/applications">
-            <div className="group p-5 rounded-sm cursor-pointer transition-all hover:border-white/15"
+            <div className="group p-5 rounded-sm cursor-pointer transition-[border-color,background-color] duration-200 hover:border-white/15"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
               <div className="flex items-start justify-between mb-4">
                 <div className="w-9 h-9 rounded-sm flex items-center justify-center"
@@ -277,7 +277,7 @@ export default function AdminDashboard() {
 
           {/* Department Portal */}
           <Link href="/departments">
-            <div className="group p-5 rounded-sm cursor-pointer transition-all hover:border-white/15"
+            <div className="group p-5 rounded-sm cursor-pointer transition-[border-color,background-color] duration-200 hover:border-white/15"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
               <div className="flex items-start justify-between mb-4">
                 <div className="w-9 h-9 rounded-sm flex items-center justify-center"
@@ -301,7 +301,7 @@ export default function AdminDashboard() {
 
           {/* User Management anchor */}
           <a href="#user-management">
-            <div className="group p-5 rounded-sm cursor-pointer transition-all hover:border-white/15"
+            <div className="group p-5 rounded-sm cursor-pointer transition-[border-color,background-color] duration-200 hover:border-white/15"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
               <div className="flex items-start justify-between mb-4">
                 <div className="w-9 h-9 rounded-sm flex items-center justify-center"
@@ -377,7 +377,7 @@ export default function AdminDashboard() {
               { value: "none",       label: "No Role" },
             ].map(({ value, label }) => (
               <button key={value} onClick={() => setFilterRole(value)}
-                className="px-3 py-2 text-xs font-semibold rounded-sm transition-all"
+                className="px-3 py-2 text-xs font-semibold rounded-sm transition-[background-color,color,border-color,transform] duration-150 active:scale-[0.97]"
                 style={{
                   background: filterRole === value ? AUDI_RED : "rgba(255,255,255,0.05)",
                   color: filterRole === value ? "#fff" : "rgba(255,255,255,0.45)",
@@ -475,7 +475,7 @@ export default function AdminDashboard() {
                       value={currentRole ?? ""}
                       onChange={e => setPendingRole(p => ({ ...p, [user.id]: e.target.value || null }))}
                       disabled={isSaving}
-                      className="flex-1 px-3 py-1.5 rounded-sm text-xs text-white outline-none transition-all"
+                      className="flex-1 px-3 py-1.5 rounded-sm text-xs text-white outline-none transition-[border-color] duration-200"
                       style={{
                         background: "rgba(255,255,255,0.06)",
                         border: `1px solid ${isDirty ? "#f59e0b66" : "rgba(255,255,255,0.1)"}`,
@@ -491,7 +491,7 @@ export default function AdminDashboard() {
                       <button
                         onClick={() => roleMutation.mutate({ userId: user.id, role: currentRole ?? null })}
                         disabled={isSaving}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-all whitespace-nowrap"
+                        className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] whitespace-nowrap"
                         style={{ background: AUDI_RED, color: "#fff" }}
                       >
                         {isSaving ? "…" : "Save"}

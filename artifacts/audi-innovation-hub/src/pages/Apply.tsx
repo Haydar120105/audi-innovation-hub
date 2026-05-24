@@ -97,7 +97,7 @@ function FieldProgress({ fields, collected }: { fields: (keyof CollectedFields)[
   return (
     <div className="flex items-center gap-2">
       <div
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-[background-color,color,border-color] duration-300"
         style={{
           background: allDone ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)",
           border: `1px solid ${allDone ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.1)"}`,
@@ -187,7 +187,7 @@ function SuccessScreen({ result }: { result: Application }) {
               <p className="text-white/50 text-xs flex-1 truncate font-mono">{trackingUrl}</p>
               <button
                 onClick={handleCopy}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all"
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-[background-color,color,border-color,transform] duration-200 active:scale-[0.97]"
                 style={
                   copied
                     ? { background: "rgba(80,200,100,0.15)", color: "rgba(80,200,100,0.9)", border: "1px solid rgba(80,200,100,0.3)" }
@@ -234,7 +234,7 @@ function SuccessScreen({ result }: { result: Application }) {
           </Link>
           <button
             onClick={() => navigate(`/applications/${result.id}`)}
-            className="px-6 py-3 text-sm font-semibold text-white rounded-sm transition-opacity hover:opacity-85"
+            className="px-6 py-3 text-sm font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
             style={{ background: AUDI_RED }}
           >
             View Full Analysis →
@@ -535,7 +535,7 @@ export default function Apply() {
             <div className="msg-in flex justify-center pt-2">
               <button
                 onClick={handleSubmit}
-                className="flex items-center gap-3 px-7 py-3.5 text-sm font-semibold text-white rounded-sm transition-opacity hover:opacity-85"
+                className="flex items-center gap-3 px-7 py-3.5 text-sm font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
                 style={{ background: AUDI_RED }}
               >
                 Submit Application
@@ -566,7 +566,7 @@ export default function Apply() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isBusy}
                 title="Upload pitch deck (PDF)"
-                className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all disabled:opacity-30 hover:bg-white/10"
+                className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-[background-color,transform] duration-150 disabled:opacity-30 hover:bg-white/10 active:scale-[0.92]"
                 style={{ color: "rgba(255,255,255,0.4)" }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -609,7 +609,7 @@ export default function Apply() {
               <button
                 onClick={() => { if (inputValue.trim()) sendMessage(inputValue.trim()); }}
                 disabled={!inputValue.trim() || isBusy}
-                className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all disabled:opacity-30"
+                className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-[background-color,transform] duration-150 disabled:opacity-30 hover:bg-white/10 active:scale-[0.92]"
                 style={{ background: AUDI_RED }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

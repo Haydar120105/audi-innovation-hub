@@ -149,7 +149,7 @@ function ChallengeCard({
       <div className="mt-5 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         <a
           href="#"
-          className="text-xs font-semibold flex items-center gap-1.5 transition-opacity hover:opacity-70"
+          className="text-xs font-semibold flex items-center gap-1.5 transition-opacity duration-150 hover:opacity-75"
           style={{ color: AUDI_RED }}
           onClick={(e) => e.preventDefault()}
         >
@@ -267,7 +267,7 @@ export default function MoreOpportunities() {
             <a
               href="#"
               onClick={(e) => e.preventDefault()}
-              className="flex-shrink-0 hidden sm:flex items-center gap-1.5 text-xs font-semibold transition-opacity hover:opacity-70"
+              className="flex-shrink-0 hidden sm:flex items-center gap-1.5 text-xs font-semibold transition-opacity duration-150 hover:opacity-75"
               style={{ color: "rgba(255,255,255,0.35)" }}
             >
               View all challenges
@@ -349,7 +349,7 @@ export default function MoreOpportunities() {
           </p>
           <a
             href="mailto:startup@audi.de?subject=Newsletter%20%E2%80%94%20Audi%20Innovation%20Hub"
-            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white rounded-sm transition-opacity hover:opacity-85"
+            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
             style={{ background: AUDI_RED }}
           >
             Subscribe to updates
