@@ -177,7 +177,13 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
         .map((b) => (b.type === "text" ? b.text : ""))
         .join("");
     } else if (toolBlocks.length > 0 && firstResponse.stop_reason === "tool_use") {
-      // Claude only called the tool without a conversational reply — do a follow-up
+      // Claude only called the tool without a conversational reply — do a follow-up.
+      // IMPORTANT: rebuild the system prompt with the newly extracted fields merged in,
+      // otherwise the follow-up still thinks the just-saved fields are missing and
+      // asks the same question again.
+      const mergedForFollowUp = { ...collectedFields, ...extractedFields };
+      const updatedSystemPrompt = buildSystemPrompt(mergedForFollowUp);
+
       const toolResults = toolBlocks
         .filter((b) => b.type === "tool_use")
         .map((b) => ({
@@ -189,7 +195,7 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
       const followUp = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
-        system: systemPrompt,
+        system: updatedSystemPrompt,   // ← uses merged fields, not stale original
         messages: [
           ...formattedMessages,
           { role: "assistant" as const, content: firstResponse.content },
@@ -203,7 +209,13 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
         .join("");
     }
 
-    res.json({ reply: replyText, extractedFields });
+    // Tell the frontend which field is being asked about AFTER this round of extraction.
+    // The frontend uses this to show the right quick-reply chips.
+    const mergedFields = { ...collectedFields, ...extractedFields };
+    const stillMissing = REQUIRED_FIELDS.filter((f) => !mergedFields[f]);
+    const currentField = stillMissing[0] ?? null;
+
+    res.json({ reply: replyText, extractedFields, currentField });
   } catch (err) {
     req.log.error({ err }, "Chat endpoint error");
     res.status(500).json({ error: "Failed to process message" });

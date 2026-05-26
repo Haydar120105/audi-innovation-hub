@@ -377,6 +377,9 @@ export default function Apply() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<Application | null>(null);
   const [deptSelection, setDeptSelection] = useState<string[]>([]);
+  // Which field the bot is currently asking about — drives quick-reply chip selection.
+  // Starts as "companyName" (first question) which has no chips → no chips shown initially.
+  const [currentField, setCurrentField] = useState<string>("companyName");
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -388,13 +391,12 @@ export default function Apply() {
   const allRequiredFilled = REQUIRED_FIELDS.every((f) => collectedFields[f]);
   const isBusy = isLoading || isPdfLoading || isSubmitting;
 
-  // The first required field that is still missing AND has predefined chip suggestions
+  // Show chips only for the field the bot is CURRENTLY asking about (from API response).
+  // This prevents stage chips from showing while the bot is still asking about company name.
   const lastMsg = messages[messages.length - 1];
   const activeChipField =
-    !isBusy && lastMsg?.role === "assistant"
-      ? (REQUIRED_FIELDS.find(
-          (f) => !collectedFields[f] && f in FIELD_SUGGESTIONS,
-        ) as keyof typeof FIELD_SUGGESTIONS | undefined)
+    !isBusy && lastMsg?.role === "assistant" && currentField && currentField in FIELD_SUGGESTIONS
+      ? (currentField as keyof typeof FIELD_SUGGESTIONS)
       : undefined;
 
   const chips = activeChipField ? FIELD_SUGGESTIONS[activeChipField] : undefined;
@@ -456,12 +458,15 @@ export default function Apply() {
         const data = (await res.json()) as {
           reply: string;
           extractedFields: Record<string, unknown>;
+          currentField: string | null;
         };
 
         setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
         if (data.extractedFields && Object.keys(data.extractedFields).length > 0) {
           mergeFields(data.extractedFields);
         }
+        // Update which field the bot is now asking about so chips match
+        setCurrentField(data.currentField ?? "");
       } catch (err) {
         console.error("[chat] sendMessage failed:", err);
         setMessages((prev) => [
@@ -558,6 +563,9 @@ export default function Apply() {
         }
 
         setMessages((prev) => [...prev, { role: "assistant", content: botReply }]);
+        // Update current field so chips reflect what's being asked next
+        if (data.missing.length > 0) setCurrentField(data.missing[0]);
+        else setCurrentField("");
       } catch {
         setMessages((prev) => [
           ...prev,
