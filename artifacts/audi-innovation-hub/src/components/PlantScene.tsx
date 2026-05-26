@@ -525,15 +525,6 @@ export default function PlantScene() {
         </motion.h1>
       </div>
 
-      {/* Hint */}
-      <motion.p
-        initial={{ opacity: 0 }} animate={{ opacity: 0.35 }}
-        transition={{ delay: 2.5, duration: 1 }}
-        className="absolute bottom-20 left-0 right-0 text-center text-white text-[10px] tracking-widest uppercase pointer-events-none z-10"
-      >
-        Click a building to explore
-      </motion.p>
-
       {/* SVG scene */}
       <svg width="100%" height="100%" viewBox={`0 -55 ${W} ${H}`} preserveAspectRatio="xMidYMid slice">
         <defs>
