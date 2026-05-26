@@ -1,7 +1,8 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn, useUser } from "@clerk/clerk-react";
+import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn, useUser, useAuth } from "@clerk/clerk-react";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
@@ -22,6 +23,21 @@ if (!PUBLISHABLE_KEY) {
 }
 
 const queryClient = new QueryClient();
+
+/**
+ * Wires Clerk's getToken() into the shared API client so every fetch
+ * includes an `Authorization: Bearer <session-token>` header.
+ * Required for cross-port dev setups (frontend :5173 → backend :8000).
+ */
+function ApiAuthSetup() {
+  const { getToken, isSignedIn } = useAuth();
+  useEffect(() => {
+    if (!isSignedIn) return;
+    setAuthTokenGetter(() => getToken());
+    return () => setAuthTokenGetter(null);
+  }, [getToken, isSignedIn]);
+  return null;
+}
 
 /** Wraps a component so it redirects to /sign-in if not authenticated. */
 function Protected({ children }: { children: React.ReactNode }) {
@@ -97,6 +113,15 @@ function DashboardRouter() {
   return <ApplicantDashboard />;
 }
 
+/** Scrolls window to top on every route change. */
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -150,9 +175,11 @@ function App() {
       signUpUrl="/sign-up"
       afterSignOutUrl="/"
     >
+      <ApiAuthSetup />
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={base}>
+            <ScrollToTop />
             <Router />
           </WouterRouter>
           <Toaster />

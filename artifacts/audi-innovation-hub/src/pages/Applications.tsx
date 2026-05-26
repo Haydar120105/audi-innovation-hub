@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import { useAuth } from "@clerk/clerk-react";
 import { UserButton } from "@clerk/clerk-react";
@@ -64,7 +64,7 @@ function ScoreBar({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-        <div className="h-full rounded-full transition-all duration-700"
+        <div className="h-full rounded-full transition-[width] duration-700"
           style={{
             width: `${score}%`,
             background: score >= 70 ? AUDI_RED : score >= 40 ? "#d97706" : "rgba(255,255,255,0.2)",
@@ -121,13 +121,13 @@ export function ApplicationsList() {
         </Link>
         <div className="flex items-center gap-3">
           <Link href="/departments">
-            <button className="px-4 py-2 text-xs font-semibold rounded-sm transition-all"
+            <button className="px-4 py-2 text-xs font-semibold rounded-sm transition-[background-color,border-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
               style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}>
               Departments
             </button>
           </Link>
           <Link href="/apply">
-            <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-opacity hover:opacity-85"
+            <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
               style={{ background: AUDI_RED }}>
               + New Application
             </button>
@@ -160,7 +160,7 @@ export function ApplicationsList() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className="p-4 rounded-sm text-left transition-all"
+              className="p-4 rounded-sm text-left transition-[background-color,border-color,transform] duration-200 active:scale-[0.98]"
               style={{
                 background: filter === f ? "rgba(187,10,33,0.1)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${filter === f ? `${AUDI_RED}44` : "rgba(255,255,255,0.07)"}`,
@@ -178,7 +178,7 @@ export function ApplicationsList() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by company or stage…"
-            className="flex-1 px-4 py-2.5 rounded-sm text-sm text-white placeholder-white/25 outline-none transition-all"
+            className="flex-1 px-4 py-2.5 rounded-sm text-sm text-white placeholder-white/25 outline-none transition-[border-color] duration-150"
             style={{
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.09)",
@@ -189,7 +189,7 @@ export function ApplicationsList() {
               <button
                 key={s}
                 onClick={() => setFilter(s)}
-                className="px-3 py-2 text-xs font-semibold rounded-sm capitalize transition-all"
+                className="px-3 py-2 text-xs font-semibold rounded-sm capitalize transition-[background-color,color,border-color,transform] duration-150 active:scale-[0.97]"
                 style={{
                   background: filter === s ? AUDI_RED : "rgba(255,255,255,0.05)",
                   color: filter === s ? "#fff" : "rgba(255,255,255,0.45)",
@@ -221,15 +221,28 @@ export function ApplicationsList() {
         {/* Empty */}
         {!isLoading && !error && filtered.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-white/25 text-sm mb-6">
-              {search ? "No applications match your search." : "No applications yet."}
-            </p>
-            <Link href="/apply">
-              <button className="px-5 py-2.5 text-sm font-semibold text-white rounded-sm"
-                style={{ background: AUDI_RED }}>
-                Submit the first application
-              </button>
-            </Link>
+            {search ? (
+              <p className="text-white/25 text-sm">No applications match your search.</p>
+            ) : (apps ?? []).length === 0 ? (
+              <div>
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                    <rect x="3" y="5" width="16" height="13" rx="2" stroke="rgba(255,255,255,0.25)" strokeWidth="1.4" />
+                    <path d="M7 9h8M7 13h5" stroke="rgba(255,255,255,0.2)" strokeWidth="1.4" strokeLinecap="round" />
+                    <path d="M11 1v4" stroke="rgba(255,255,255,0.2)" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <p className="text-white/35 text-sm font-medium mb-2">No applications assigned yet</p>
+                <p className="text-white/20 text-xs max-w-xs mx-auto leading-relaxed">
+                  A superuser needs to assign applications to you. Once assigned, they'll appear here.
+                </p>
+              </div>
+            ) : (
+              <p className="text-white/25 text-sm">No applications match the current filter.</p>
+            )}
           </div>
         )}
 
@@ -266,7 +279,7 @@ function AppRow({ app, odd }: { app: ApplicationSummary; odd: boolean }) {
   return (
     <Link href={`/applications/${app.id}`}>
       <div
-        className="grid grid-cols-12 gap-4 px-5 py-4 cursor-pointer transition-all group items-center"
+        className="grid grid-cols-12 gap-4 px-5 py-4 cursor-pointer transition-colors duration-150 group items-center hover:bg-white/[0.02]"
         style={{
           background: odd ? "rgba(255,255,255,0.015)" : "transparent",
           borderBottom: "1px solid rgba(255,255,255,0.04)",
@@ -341,7 +354,8 @@ export function ApplicationDetail() {
   });
 
   const meta = sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
-  const isStaff = isLoaded && meta?.["role"] === "audi_staff";
+  const isSuperuser = isLoaded && meta?.["role"] === "superuser";
+  const isStaff = isLoaded && (meta?.["role"] === "audi_staff" || isSuperuser);
 
   const save = useCallback(
     (fields: Parameters<typeof patch>[0]["data"]) => {
@@ -487,9 +501,9 @@ export function ApplicationDetail() {
           </div>
         )}
 
-        {/* Staff actions panel — only for audi_staff */}
+        {/* Staff / superuser actions panel */}
         {isStaff && (
-          <StaffPanel app={app} onSave={save} />
+          <StaffPanel app={app} onSave={save} isSuperuser={isSuperuser} />
         )}
 
         {!structured && cases.length === 0 && scores.length === 0 && (
@@ -525,7 +539,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
-      className="px-3 py-1.5 text-xs font-semibold rounded transition-all"
+      className="px-3 py-1.5 text-xs font-semibold rounded transition-[background-color,color,border-color] duration-200"
       style={{
         background: copied ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.08)",
         color: copied ? "#16a34a" : "rgba(255,255,255,0.5)",
@@ -539,13 +553,33 @@ function CopyButton({ text }: { text: string }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // STAFF PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
+// Pipeline steps shared between superuser stepper and status select
+const PIPELINE_STEPS = [
+  { status: "pending",     label: "Pending",     color: "#d97706" },
+  { status: "routed",      label: "Analysed",    color: "#3b82f6" },
+  { status: "shortlisted", label: "Shortlisted", color: "#8b5cf6" },
+  { status: "accepted",    label: "Accepted",    color: "#16a34a" },
+];
+
+interface StaffUserLite {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  imageUrl: string;
+}
+
 function StaffPanel({
   app,
   onSave,
+  isSuperuser = false,
 }: {
-  app: { status: string; rating?: number | null; notes?: string | null; nextStep?: string | null; requirements?: RequirementItem[] | null; milestones?: MilestoneItem[] | null; kpis?: KpiItem[] | null };
+  app: { status: string; rating?: number | null; notes?: string | null; nextStep?: string | null; requirements?: RequirementItem[] | null; milestones?: MilestoneItem[] | null; kpis?: KpiItem[] | null; assignedEmployee?: { name: string; role: string; email: string; department: string; clerkId?: string } | null; ndaStatus?: string | null };
   onSave: (data: Record<string, unknown>) => void;
+  isSuperuser?: boolean;
 }) {
+  const { getToken } = useAuth();
+
   const [status, setStatus] = useState(app.status);
   const [rating, setRating] = useState<number>(app.rating ?? 0);
   const [notes, setNotes] = useState(app.notes ?? "");
@@ -555,10 +589,66 @@ function StaffPanel({
   const [kpis, setKpis] = useState<KpiItem[]>(app.kpis ?? []);
   const [saved, setSaved] = useState(false);
 
+  // Onboarding / assignment fields
+  const [empName, setEmpName] = useState(app.assignedEmployee?.name ?? "");
+  const [empRole, setEmpRole] = useState(app.assignedEmployee?.role ?? "");
+  const [empEmail, setEmpEmail] = useState(app.assignedEmployee?.email ?? "");
+  const [empDept, setEmpDept] = useState(app.assignedEmployee?.department ?? "");
+  const [ndaStatus, setNdaStatus] = useState<string>(app.ndaStatus ?? "pending_signature");
+
+  // Superuser: Clerk staff users
+  const [staffUsers, setStaffUsers] = useState<StaffUserLite[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [pickedStaffId, setPickedStaffId] = useState(app.assignedEmployee?.clerkId ?? "");
+
+  // Load Clerk staff users for superuser picker
+  useEffect(() => {
+    if (!isSuperuser) return;
+    setStaffLoading(true);
+    getToken()
+      .then(token =>
+        fetch("/api/admin/users", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }),
+      )
+      .then(r => r.json())
+      .then((users: StaffUserLite[] & { role?: string }[]) =>
+        setStaffUsers(users.filter((u: any) => u.role === "audi_staff")),
+      )
+      .catch(console.error)
+      .finally(() => setStaffLoading(false));
+  }, [isSuperuser, getToken]);
+
+  // Pipeline advance helpers
+  const currentStepIdx = PIPELINE_STEPS.findIndex(s => s.status === status);
+  const nextPipelineStep =
+    currentStepIdx >= 0 && currentStepIdx < PIPELINE_STEPS.length - 1
+      ? PIPELINE_STEPS[currentStepIdx + 1]
+      : null;
+
   const triggerSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
 
+  const handleAdvance = () => {
+    if (!nextPipelineStep) return;
+    const newStatus = nextPipelineStep.status;
+    setStatus(newStatus);
+    onSave({ status: newStatus });
+    triggerSaved();
+  };
+
+  const handlePickStaff = (userId: string) => {
+    setPickedStaffId(userId);
+    const user = staffUsers.find(u => u.id === userId);
+    if (!user) { setEmpName(""); setEmpEmail(""); return; }
+    setEmpName(`${user.firstName} ${user.lastName}`.trim() || user.email);
+    setEmpEmail(user.email);
+  };
+
   const handleSave = () => {
-    onSave({ status, rating: rating || null, notes, nextStep, requirements: reqs, milestones, kpis });
+    const assignedEmployee = empName && empRole && empEmail && empDept
+      ? { name: empName, role: empRole, email: empEmail, department: empDept, clerkId: pickedStaffId || undefined }
+      : null;
+    onSave({ status, rating: rating || null, notes, nextStep, requirements: reqs, milestones, kpis, assignedEmployee, ndaStatus: ndaStatus || null });
     triggerSaved();
   };
 
@@ -595,12 +685,200 @@ function StaffPanel({
         </div>
         <button
           onClick={handleSave}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-sm transition-all"
+          className="px-5 py-2 text-sm font-semibold text-white rounded-sm transition-[background-color,transform] duration-200 active:scale-[0.97]"
           style={{ background: saved ? "#16a34a" : AUDI_RED }}
         >
           {saved ? "✓ Saved" : "Save Changes"}
         </button>
       </div>
+
+      {/* ── Superuser admin controls ── */}
+      {isSuperuser && (
+        <div
+          className="rounded-sm overflow-hidden"
+          style={{ border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.03)" }}
+        >
+          {/* Header */}
+          <div
+            className="px-5 py-3 flex items-center gap-2"
+            style={{ borderBottom: "1px solid rgba(245,158,11,0.15)" }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f59e0b" }} />
+            <p className="text-xs font-semibold" style={{ color: "#f59e0b" }}>
+              Admin Controls — Superuser Only
+            </p>
+          </div>
+
+          <div className="p-5 space-y-6">
+            {/* ── Pipeline stepper ── */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-4">
+                Advance to Next Round
+              </p>
+
+              {/* Step indicators */}
+              <div className="flex items-center mb-5">
+                {PIPELINE_STEPS.map((step, idx) => {
+                  const isActive = step.status === status;
+                  const isDone = idx < currentStepIdx;
+                  return (
+                    <div key={step.status} className="flex items-center flex-1 last:flex-none">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all duration-300"
+                          style={{
+                            background: isActive
+                              ? step.color
+                              : isDone
+                                ? "rgba(255,255,255,0.12)"
+                                : "rgba(255,255,255,0.05)",
+                            color: isActive ? "#fff" : isDone ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.2)",
+                            border: `1.5px solid ${isActive ? step.color : isDone ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.07)"}`,
+                            boxShadow: isActive ? `0 0 14px ${step.color}50` : "none",
+                          }}
+                        >
+                          {isDone ? (
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                              <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : (
+                            idx + 1
+                          )}
+                        </div>
+                        <p
+                          className="text-[9px] mt-1.5 font-semibold tracking-wide"
+                          style={{ color: isActive ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.22)" }}
+                        >
+                          {step.label.toUpperCase()}
+                        </p>
+                      </div>
+                      {idx < PIPELINE_STEPS.length - 1 && (
+                        <div
+                          className="flex-1 h-px mx-2 mb-4 transition-[background-color] duration-300"
+                          style={{
+                            background: idx < currentStepIdx
+                              ? "rgba(255,255,255,0.18)"
+                              : "rgba(255,255,255,0.07)",
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Advance button */}
+              {nextPipelineStep ? (
+                <button
+                  onClick={handleAdvance}
+                  className="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-sm text-sm font-semibold text-white transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.98]"
+                  style={{ background: nextPipelineStep.color }}
+                >
+                  Advance to
+                  <span className="font-bold">{nextPipelineStep.label}</span>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M3 7h8M8 3l4 4-4 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : (
+                <div
+                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-sm"
+                  style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.2)" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2.5 7l3 3 6-6" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <p className="text-xs font-semibold" style={{ color: "#16a34a" }}>
+                    Final stage reached — application is Accepted
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Assign Audi Staff Member ── */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-3">
+                Assign Audi Staff Member
+              </p>
+
+              {staffLoading ? (
+                <div className="flex items-center gap-2 py-2">
+                  <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "#f59e0b transparent transparent transparent" }} />
+                  <p className="text-white/30 text-xs">Loading staff users…</p>
+                </div>
+              ) : staffUsers.length === 0 ? (
+                <p className="text-white/25 text-xs leading-relaxed">
+                  No Audi staff users found. Assign the <code className="font-mono text-[10px] bg-white/5 px-1 rounded">audi_staff</code> role to users in the Admin panel first.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {/* Picker */}
+                  <select
+                    value={pickedStaffId}
+                    onChange={e => handlePickStaff(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-sm text-sm text-white outline-none"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    <option value="">— Select a staff member —</option>
+                    {staffUsers.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {`${u.firstName} ${u.lastName}`.trim() || u.email}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Preview card */}
+                  {pickedStaffId && (() => {
+                    const picked = staffUsers.find(u => u.id === pickedStaffId);
+                    return (
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 rounded-sm"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
+                      >
+                        {picked?.imageUrl ? (
+                          <img src={picked.imageUrl} className="w-9 h-9 rounded-full flex-shrink-0 object-cover" alt="" />
+                        ) : (
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}
+                          >
+                            {empName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-white text-sm font-semibold">{empName || "—"}</p>
+                          <p className="text-white/35 text-xs">{empEmail}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Role + Department (editable after picking) */}
+                  {pickedStaffId && (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {[
+                        { label: "Role / Title", value: empRole, setter: setEmpRole, ph: "e.g. Innovation Manager" },
+                        { label: "Department", value: empDept, setter: setEmpDept, ph: "e.g. R&D Partnerships" },
+                      ].map(({ label, value, setter, ph }) => (
+                        <div key={label}>
+                          <p className="text-white/25 text-[10px] font-semibold uppercase tracking-wide mb-1">{label}</p>
+                          <input
+                            value={value}
+                            onChange={e => setter(e.target.value)}
+                            placeholder={ph}
+                            className="w-full px-3 py-2 rounded-sm text-sm text-white placeholder-white/20 outline-none"
+                            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Row 1: Status + Rating */}
       <div className="grid grid-cols-2 gap-4">
@@ -640,6 +918,72 @@ function StaffPanel({
         </div>
       </div>
 
+      {/* Onboarding — only shown when accepted */}
+      {status === "accepted" && (
+        <div className="rounded-sm overflow-hidden" style={{ border: "1px solid rgba(22,163,74,0.25)", background: "rgba(22,163,74,0.04)" }}>
+          <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: "1px solid rgba(22,163,74,0.12)" }}>
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#16a34a" }} />
+            <p className="text-xs font-semibold" style={{ color: "#16a34a" }}>Onboarding Bundle — visible to applicant</p>
+          </div>
+          <div className="p-5 space-y-4">
+            {/* NDA Status */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-2">NDA Status</p>
+              <div className="flex gap-2">
+                {["pending_signature", "signed"].map(val => (
+                  <button
+                    key={val}
+                    onClick={() => setNdaStatus(val)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[background-color,color,border-color] duration-200 active:scale-[0.97]"
+                    style={{
+                      background: ndaStatus === val ? (val === "signed" ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.08)") : "rgba(255,255,255,0.03)",
+                      color: ndaStatus === val ? (val === "signed" ? "#16a34a" : "rgba(255,255,255,0.7)") : "rgba(255,255,255,0.3)",
+                      border: `1px solid ${ndaStatus === val ? (val === "signed" ? "rgba(22,163,74,0.3)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.07)"}`,
+                    }}
+                  >
+                    {val === "signed" ? "✓ Signed" : "Pending signature"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Assigned Employee */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-3">Assigned Audi Employee</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Full name", value: empName, setter: setEmpName, placeholder: "e.g. Anna Müller" },
+                  { label: "Role / Title", value: empRole, setter: setEmpRole, placeholder: "e.g. Innovation Manager" },
+                  { label: "Email", value: empEmail, setter: setEmpEmail, placeholder: "e.g. a.mueller@audi.de" },
+                  { label: "Department", value: empDept, setter: setEmpDept, placeholder: "e.g. R&D Partnerships" },
+                ].map(({ label, value, setter, placeholder }) => (
+                  <div key={label}>
+                    <p className="text-white/25 text-[10px] font-semibold uppercase tracking-wide mb-1">{label}</p>
+                    <input
+                      value={value}
+                      onChange={e => setter(e.target.value)}
+                      placeholder={placeholder}
+                      className="w-full px-3 py-2 rounded-sm text-sm text-white placeholder-white/20 outline-none"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+                    />
+                  </div>
+                ))}
+              </div>
+              {(empName || empEmail) && (
+                <div className="mt-3 flex items-center gap-3 px-4 py-3 rounded-sm" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "rgba(187,10,33,0.15)", color: AUDI_RED }}>
+                    {empName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                  </div>
+                  <div>
+                    <p className="text-white text-xs font-semibold">{empName || "—"}</p>
+                    <p className="text-white/35 text-[10px]">{empRole || "—"} · {empDept || "—"}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Notes */}
       <div className="p-5 rounded-sm" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-3">Internal Notes</p>
@@ -670,7 +1014,7 @@ function StaffPanel({
         <div className="flex items-center justify-between mb-4">
           <p className="text-white/30 text-xs font-semibold uppercase tracking-wide">Requirements</p>
           <button onClick={addReq}
-            className="px-3 py-1 text-xs font-semibold rounded-sm transition-all"
+            className="px-3 py-1 text-xs font-semibold rounded-sm transition-[background-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
             style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}>
             + Add
           </button>
@@ -680,7 +1024,7 @@ function StaffPanel({
           {reqs.map(req => (
             <div key={req.id} className="flex items-center gap-3">
               <button onClick={() => toggleReq(req.id)} className="flex-shrink-0">
-                <div className="w-4 h-4 rounded-sm flex items-center justify-center transition-all"
+                <div className="w-4 h-4 rounded-sm flex items-center justify-center transition-[background-color,border-color] duration-150"
                   style={{ background: req.done ? AUDI_RED : "transparent", border: `1.5px solid ${req.done ? AUDI_RED : "rgba(255,255,255,0.2)"}` }}>
                   {req.done && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 </div>
@@ -710,7 +1054,7 @@ function StaffPanel({
         <div className="flex items-center justify-between mb-4">
           <p className="text-white/30 text-xs font-semibold uppercase tracking-wide">Milestones</p>
           <button onClick={addMs}
-            className="px-3 py-1 text-xs font-semibold rounded-sm transition-all"
+            className="px-3 py-1 text-xs font-semibold rounded-sm transition-[background-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
             style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}>
             + Add
           </button>
@@ -753,7 +1097,7 @@ function StaffPanel({
         <div className="flex items-center justify-between mb-4">
           <p className="text-white/30 text-xs font-semibold uppercase tracking-wide">KPIs</p>
           <button onClick={addKpi}
-            className="px-3 py-1 text-xs font-semibold rounded-sm transition-all"
+            className="px-3 py-1 text-xs font-semibold rounded-sm transition-[background-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
             style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}>
             + Add KPI
           </button>
@@ -802,7 +1146,7 @@ function StaffPanel({
       <div className="flex justify-end pt-2">
         <button
           onClick={handleSave}
-          className="px-7 py-3 text-sm font-semibold text-white rounded-sm transition-all"
+          className="px-7 py-3 text-sm font-semibold text-white rounded-sm transition-[background-color,transform] duration-200 active:scale-[0.97]"
           style={{ background: saved ? "#16a34a" : AUDI_RED }}
         >
           {saved ? "✓ Changes Saved" : "Save All Changes"}

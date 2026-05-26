@@ -1,9 +1,14 @@
 import { Router, type IRouter } from "express";
+import { createClerkClient } from "@clerk/express";
 import { requireSuperuser, CLERK_ENABLED } from "../../lib/auth";
 
 const VALID_ROLES = new Set(["superuser", "audi_staff", "applicant", ""]);
 
 const router: IRouter = Router();
+
+function clerk() {
+  return createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] });
+}
 
 /** GET /admin/users — list all Clerk users with their role */
 router.get("/admin/users", requireSuperuser, async (_req, res): Promise<void> => {
@@ -12,9 +17,7 @@ router.get("/admin/users", requireSuperuser, async (_req, res): Promise<void> =>
     return;
   }
 
-  const { clerkClient } = await import("@clerk/express");
-
-  const response = await clerkClient.users.getUserList({ limit: 500, orderBy: "-created_at" });
+  const response = await clerk().users.getUserList({ limit: 500, orderBy: "-created_at" });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const users = response.data.map((u: any) => ({
@@ -46,11 +49,8 @@ router.patch("/admin/users/:userId/role", requireSuperuser, async (req, res): Pr
     return;
   }
 
-  const { clerkClient } = await import("@clerk/express");
-
   const newRole = role || null;
-
-  await clerkClient.users.updateUserMetadata(userId, {
+  await clerk().users.updateUserMetadata(userId, {
     publicMetadata: { role: newRole },
   });
 
@@ -66,9 +66,7 @@ router.delete("/admin/users/:userId", requireSuperuser, async (req, res): Promis
     return;
   }
 
-  const { clerkClient } = await import("@clerk/express");
-
-  await clerkClient.users.deleteUser(userId);
+  await clerk().users.deleteUser(userId);
   res.json({ ok: true, userId });
 });
 

@@ -119,6 +119,13 @@ const KpiItem = zod.object({
   unit: zod.string().optional(),
 });
 
+const AssignedEmployeeSchema = zod.object({
+  name: zod.string(),
+  role: zod.string(),
+  email: zod.string().email(),
+  department: zod.string(),
+});
+
 export const UpdateApplicationBody = zod.object({
   "status": zod.enum(['pending', 'routed', 'shortlisted', 'accepted', 'declined', 'archived']).optional(),
   "notes": zod.string().optional(),
@@ -127,6 +134,8 @@ export const UpdateApplicationBody = zod.object({
   "requirements": zod.array(RequirementItem).optional(),
   "milestones": zod.array(MilestoneItem).optional(),
   "kpis": zod.array(KpiItem).optional(),
+  "assignedEmployee": AssignedEmployeeSchema.nullable().optional(),
+  "ndaStatus": zod.enum(['pending_signature', 'signed']).nullable().optional(),
 })
 
 export const UpdateApplicationResponse = zod.object({

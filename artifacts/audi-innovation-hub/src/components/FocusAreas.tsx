@@ -53,12 +53,15 @@ const FOCUS_AREAS = [
   },
 ];
 
+// Custom strong ease-out — starts fast, feels instantly responsive
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
 const cardVariants = {
-  hidden: { opacity: 0, y: 28 },
+  hidden: { opacity: 0, y: 18 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.05, duration: 0.45, ease: "easeOut" },
+    transition: { delay: i * 0.04, duration: 0.42, ease: EASE_OUT },
   }),
 };
 
@@ -66,10 +69,10 @@ export default function FocusAreas() {
   return (
     <section className="w-full bg-[#0A0A14] border-t border-white/5 px-6 md:px-12 lg:px-20 py-16">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 14 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.7, ease: "easeOut" }}
+        transition={{ duration: 0.5, ease: EASE_OUT }}
         className="max-w-7xl mx-auto mb-12"
       >
         <p className="text-xs font-semibold tracking-[0.2em] text-[#BB0A21] uppercase mb-3">
@@ -94,7 +97,7 @@ export default function FocusAreas() {
             whileInView="visible"
             viewport={{ once: true, margin: "-40px" }}
             data-testid={`card-focus-area-${idx}`}
-            className={`group relative rounded-sm border transition-all duration-300
+            className={`group relative rounded-sm border transition-[border-color,background-color] duration-200
               ${area.isWildcard
                 ? "border-[#BB0A21]/30 bg-[#BB0A21]/5 hover:border-[#BB0A21]/60 hover:bg-[#BB0A21]/10"
                 : "border-white/5 bg-white/[0.025] hover:border-white/12 hover:bg-white/[0.05]"
@@ -135,15 +138,15 @@ export default function FocusAreas() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ delay: 0.3, duration: 0.6 }}
+        transition={{ delay: 0.2, duration: 0.45, ease: EASE_OUT }}
         className="max-w-7xl mx-auto mt-12 flex items-center gap-6"
       >
         <Link href="/apply">
           <button
-            className="bg-[#BB0A21] hover:bg-[#A0081C] text-white px-10 py-4 font-medium transition-colors flex items-center gap-2 rounded-sm text-sm tracking-wide"
+            className="bg-[#BB0A21] hover:bg-[#A0081C] text-white px-10 py-4 font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] flex items-center gap-2 rounded-sm text-sm tracking-wide"
             data-testid="button-apply-now"
           >
             <span>Apply Now</span>

@@ -44,14 +44,6 @@ function hitZone(x: number, y: number, h: number, w: number, d: number): string 
   ].map(p => p.join(",")).join(" ");
 }
 
-// ── F1 circuit — outer loop around the factory complex ──────────
-const F1_TRACK: [number, number][] = [
-  [-3.5,  0.5], [-3.5, -0.5], [-2.8, -2.0], [-1.2, -3.2],
-  [ 0.5, -3.5], [ 2.5, -3.2], [ 4.5, -2.2], [ 6.2, -0.8],
-  [ 7.0,  0.8], [ 7.2,  2.5], [ 6.5,  4.2], [ 5.0,  5.8],
-  [ 3.0,  6.8], [ 1.0,  7.0], [-1.0,  6.5], [-2.5,  5.2],
-  [-3.5,  3.8], [-3.5,  2.0], [-3.5,  0.5],
-];
 
 interface BoxProps {
   x: number; y: number; z?: number;
@@ -65,9 +57,9 @@ function Box({ x, y, z = 0, w, d, h, tc, lc, rc, delay = 0 }: BoxProps) {
   const oy = isoY(x + w / 2, y + d / 2, z);
   return (
     <motion.g
-      initial={{ opacity: 0, scaleY: 0 }}
+      initial={{ opacity: 0, scaleY: 0.88 }}
       animate={{ opacity: 1, scaleY: 1 }}
-      transition={{ delay, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ delay, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       style={{ transformOrigin: `${ox}px ${oy}px` }}
     >
       <polygon points={f.right} fill={rc} />
@@ -163,100 +155,6 @@ function AudiCar({ color = "#7A1018" }: { color?: string }) {
   );
 }
 
-// ── F1 car — open-wheel single-seater, side profile ────────────
-function F1Car({ color = "#BB0A21" }: { color?: string }) {
-  return (
-    <g opacity={0.96}>
-      {/* Shadow */}
-      <ellipse cx={0} cy={9} rx={30} ry={4} fill="rgba(0,0,0,0.6)" />
-
-      {/* Front wing — wide, multi-element */}
-      <path d="M 22,-1 L 36,-1 L 36,1.5 L 22,1.5 Z" fill={color} style={{ filter: "brightness(0.9)" }} />
-      <path d="M 23,-3 L 33,-3 L 33,-1 L 23,-1 Z" fill={color} style={{ filter: "brightness(0.8)" }} />
-      <rect x={35} y={-4} width={2.5} height={7} rx={0.6} fill={color} style={{ filter: "brightness(0.75)" }} />
-
-      {/* Nose cone — narrow & long */}
-      <path d="M 36,0 C 30,-0.2 24,-0.4 20,-0.5 L 20,0.5 C 24,0.4 30,0.2 36,0 Z"
-        fill={color} style={{ filter: "brightness(0.85)" }} />
-
-      {/* Main body — very flat */}
-      <path d="M 20,-0.5 C 15,-2 6,-3.5 -1,-3.8 C -7,-3.8 -13,-3.2 -17,-2 C -20,-1.3 -21,0 -20,2 C -16,3 8,3 20,0.5 Z"
-        fill={color} style={{ filter: "brightness(0.7)" }} />
-
-      {/* Body highlight */}
-      <path d="M 3,-3.8 C 7,-4.3 14,-3.5 18,-2.2 C 14,-1.8 7,-1.6 3,-1.8 Z"
-        fill="rgba(255,255,255,0.2)" />
-
-      {/* Sidepod air intake */}
-      <path d="M 6,-3.2 L 9,-3.2 L 9,-1.5 L 6,-1.5 Z" fill="rgba(0,0,0,0.5)" />
-
-      {/* Cockpit */}
-      <path d="M 3,-3.8 C 4,-6.5 6,-7.5 8,-7 C 10,-6.5 10,-5 9,-3 Z"
-        fill="rgba(8,8,24,0.95)" />
-      <path d="M 2,-3.8 C 3,-7 6,-8 8,-7.5 C 10,-7 11,-5.5 9.5,-3 L 9,-3 Z"
-        fill={color} style={{ filter: "brightness(1.15)" }} />
-
-      {/* Halo */}
-      <path d="M 2,-3.8 Q 5.5,-10 9.5,-3"
-        stroke={color} strokeWidth={2.5} fill="none" style={{ filter: "brightness(1.4)" }} />
-      <line x1={5.5} y1={-9.8} x2={5.5} y2={-3.8}
-        stroke={color} strokeWidth={1.8} style={{ filter: "brightness(1.3)" }} />
-
-      {/* Rear body taper */}
-      <path d="M -17,-2 C -20,-1.5 -21,-0.5 -21,0.5 C -21,1.5 -20,2.5 -17,3"
-        fill={color} style={{ filter: "brightness(0.55)" }} />
-
-      {/* Exhaust plume */}
-      <ellipse cx={-22} cy={1} rx={4} ry={1.8} fill="rgba(255,130,20,0.8)" />
-      <ellipse cx={-24} cy={1} rx={2} ry={1} fill="rgba(255,210,80,0.65)" />
-
-      {/* Rear wing — high & aggressive */}
-      <path d="M -20,-9 L -11,-9 L -11,-6 L -20,-6 Z"
-        fill={color} style={{ filter: "brightness(1.2)" }} />
-      <path d="M -20,-6 L -11,-6 L -11,-4.2 L -20,-4.2 Z"
-        fill={color} style={{ filter: "brightness(0.9)" }} />
-      <rect x={-18.5} y={-4.2} width={2} height={7.5}
-        fill={color} style={{ filter: "brightness(0.72)" }} />
-      <rect x={-22} y={-10} width={2.5} height={13} rx={0.5}
-        fill={color} style={{ filter: "brightness(0.65)" }} />
-
-      {/* Front wheel — narrow slick */}
-      <circle cx={20} cy={7} r={5.5} fill="#06060F" />
-      <circle cx={20} cy={7} r={3.5} fill="#10101C" />
-      {[0,60,120,180,240,300].map(deg => {
-        const rad = deg * Math.PI / 180;
-        return <line key={deg}
-          x1={20 + Math.cos(rad) * 1.2} y1={7 + Math.sin(rad) * 1.2}
-          x2={20 + Math.cos(rad) * 3.2} y2={7 + Math.sin(rad) * 3.2}
-          stroke="#383848" strokeWidth={1} />;
-      })}
-      <circle cx={20} cy={7} r={1.1} fill="#909098" />
-
-      {/* Rear wheel — wide slick */}
-      <circle cx={-14} cy={7} r={7} fill="#06060F" />
-      <circle cx={-14} cy={7} r={4.5} fill="#10101C" />
-      {[0,60,120,180,240,300].map(deg => {
-        const rad = deg * Math.PI / 180;
-        return <line key={deg}
-          x1={-14 + Math.cos(rad) * 1.5} y1={7 + Math.sin(rad) * 1.5}
-          x2={-14 + Math.cos(rad) * 4.2} y2={7 + Math.sin(rad) * 4.2}
-          stroke="#383848" strokeWidth={1.3} />;
-      })}
-      <circle cx={-14} cy={7} r={1.4} fill="#909098" />
-
-      {/* Audi four rings on sidepod */}
-      {[2.5, 5.5, 8.5, 11.5].map(rx => (
-        <circle key={rx} cx={rx} cy={-2.5}
-          r={1.5} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={0.5} />
-      ))}
-
-      {/* DRL headlight strip */}
-      <path d="M 34,-0.5 L 37,-0.5 L 37,0.5 L 34,0.5 Z" fill="rgba(255,255,200,0.95)" />
-      {/* Brake glow */}
-      <ellipse cx={-23} cy={0.5} rx={1.5} ry={0.8} fill="rgba(255,40,10,0.9)" />
-    </g>
-  );
-}
 
 // Direction-aware Audi road car — flips to face travel direction
 function MovingCar({ path, duration, delay, color }: {
@@ -297,44 +195,6 @@ function MovingCar({ path, duration, delay, color }: {
   );
 }
 
-// Direction-aware F1 car — flips to face travel direction (outer track only)
-function MovingF1Car({ path, duration, delay, color }: {
-  path: [number, number][]; duration: number; delay: number; color: string;
-}) {
-  const totalLen = path.length - 1;
-  const [pos, setPos] = useState({
-    x: isoX(path[0][0], path[0][1]),
-    y: isoY(path[0][0], path[0][1], 0.06),
-    flip: false,
-  });
-  useEffect(() => {
-    let start: number | null = null;
-    let frame: number;
-    const tick = (ts: number) => {
-      if (start === null) start = ts - delay * 1000;
-      const t = (((ts - start) / 1000 % duration) + duration) % duration / duration;
-      const segT = t * totalLen;
-      const seg = Math.min(Math.floor(segT), totalLen - 1);
-      const frac = segT - seg;
-      const a = path[seg], b = path[Math.min(seg + 1, totalLen)];
-      const cx = isoX(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac);
-      const cy = isoY(a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac, 0.06);
-      // Stable direction: compare segment start vs end in screen space
-      const startX = isoX(a[0], a[1]);
-      const endX   = isoX(b[0], b[1]);
-      setPos({ x: cx, y: cy, flip: endX < startX });
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, []);
-  const sx = pos.flip ? -0.6 : 0.6;
-  return (
-    <g transform={`translate(${pos.x} ${pos.y}) scale(${sx} 0.6)`}>
-      <F1Car color={color} />
-    </g>
-  );
-}
 
 function Person({ x, y, duration, delay }: { x: number; y: number; duration: number; delay: number }) {
   const sx = isoX(x, y), sy = isoY(x, y, 0);
@@ -619,9 +479,6 @@ export default function PlantScene() {
   const [, navigate] = useLocation();
   const selected = DEPARTMENTS.find(d => d.id === activeDept) ?? null;
 
-  // All paths are closed loops — last point == first point
-  const loopRed: [number, number][]   = [[-2,0],[0,0],[2,0],[4,0],[5,0],[5,1.5],[5,3],[4,3],[2,3],[0,3],[-2,3],[-2,1.5],[-2,0]];
-  const loopBlue: [number, number][]  = [[5,3],[5,1.5],[5,0],[4,0],[2,0],[0,0],[-2,0],[-2,1.5],[-2,3],[0,3],[2,3],[4,3],[5,3]];
   // Inner figure-8: down x=1, cross bottom, up x=3, cross top, back to start
   const loopBlack: [number, number][] = [[1,-1],[1,0],[1,1.5],[1,3],[1,4],[2,4],[3,4],[3,3],[3,1.5],[3,0],[3,-1],[2,-1],[1,-1]];
 
@@ -668,15 +525,6 @@ export default function PlantScene() {
         </motion.h1>
       </div>
 
-      {/* Hint */}
-      <motion.p
-        initial={{ opacity: 0 }} animate={{ opacity: 0.35 }}
-        transition={{ delay: 2.5, duration: 1 }}
-        className="absolute bottom-20 left-0 right-0 text-center text-white text-[10px] tracking-widest uppercase pointer-events-none z-10"
-      >
-        Click a building to explore
-      </motion.p>
-
       {/* SVG scene */}
       <svg width="100%" height="100%" viewBox={`0 -55 ${W} ${H}`} preserveAspectRatio="xMidYMid slice">
         <defs>
@@ -699,10 +547,6 @@ export default function PlantScene() {
             <stop offset="0%" stopColor="#121128" />
             <stop offset="100%" stopColor="#0C0B1A" />
           </linearGradient>
-          <linearGradient id="trackGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1C1C36" />
-            <stop offset="100%" stopColor="#101020" />
-          </linearGradient>
         </defs>
 
         {/* Ground — slightly wider to cover track area */}
@@ -713,39 +557,8 @@ export default function PlantScene() {
           [isoX(-5, 9), isoY(-5, 9)],
         ].map(p => p.join(",")).join(" ")} />
 
-        {/* ── F1 circuit track ── rendered under buildings ── */}
-        {(() => {
-          const p = (closed = true) => {
-            const pts = F1_TRACK.map(([x, y]) => `${isoX(x, y)},${isoY(x, y, 0.03)}`);
-            return pts.join(" ");
-          };
-          const base = { fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-          return (
-            <g>
-              {/* Red rumble-strip glow */}
-              <polyline {...base} points={p()} stroke="rgba(187,10,33,0.25)" strokeWidth={40} />
-              {/* White edge markers */}
-              <polyline {...base} points={p()} stroke="rgba(255,255,255,0.45)" strokeWidth={32} />
-              {/* Asphalt main */}
-              <polyline {...base} points={p()} stroke="#101020" strokeWidth={28} />
-              {/* Asphalt surface (lighter) */}
-              <polyline {...base} points={p()} stroke="#181830" strokeWidth={22} />
-              {/* Centre dashed line */}
-              <polyline {...base} points={p()} stroke="rgba(255,220,40,0.3)" strokeWidth={1.5} strokeDasharray="12 9" />
-            </g>
-          );
-        })()}
 
-        {/* Roads */}
-        {([
-          [[-2.2, -0.15], [5.2, -0.15], [5.2, 0.15], [-2.2, 0.15]],
-          [[-2.2, 2.85], [5.2, 2.85], [5.2, 3.15], [-2.2, 3.15]],
-          [[-2.15, 0], [-1.85, 0], [-1.85, 3], [-2.15, 3]],
-          [[4.85, 0], [5.15, 0], [5.15, 3], [4.85, 3]],
-        ] as [number, number][][]).map((pts, i) => (
-          <polygon key={i} fill="#1A1832"
-            points={pts.map(([px, py]) => `${isoX(px, py)},${isoY(px, py, 0.02)}`).join(" ")} />
-        ))}
+        {/* Inner factory roads only */}
         {([
           [[0.85, -1], [1.15, -1], [1.15, 4], [0.85, 4]],
           [[2.85, -1], [3.15, -1], [3.15, 4], [2.85, 4]],
@@ -754,19 +567,11 @@ export default function PlantScene() {
             points={pts.map(([px, py]) => `${isoX(px, py)},${isoY(px, py, 0.02)}`).join(" ")} />
         ))}
 
-        {/* Road cars — outer loop (CCW red, CW blue) */}
-        <MovingCar path={loopRed}   duration={18} delay={0}    color="#7A1018" />
-        <MovingCar path={loopBlue}  duration={20} delay={5}    color="#0E2E58" />
-        <MovingCar path={loopRed}   duration={18} delay={11}   color="#1A1A40" />
-        {/* Road cars — inner factory roads (loopBlack) */}
+        {/* Road cars — inner factory roads only */}
         <MovingCar path={loopBlack} duration={13} delay={1}    color="#3A3A52" />
         <MovingCar path={loopBlack} duration={13} delay={4.8}  color="#1E3820" />
         <MovingCar path={loopBlack} duration={13} delay={8.5}  color="#502010" />
         <MovingCar path={loopBlack} duration={13} delay={11.2} color="#202040" />
-        {/* F1 cars — outer circuit, 3 cars with even spacing */}
-        <MovingF1Car path={F1_TRACK} duration={26} delay={0}   color="#BB0A21" />
-        <MovingF1Car path={F1_TRACK} duration={26} delay={9}   color="#C8C8D8" />
-        <MovingF1Car path={F1_TRACK} duration={26} delay={17}  color="#E8E0C0" />
 
         {/* ── BUILDINGS ── dark futuristic palette ── */}
         {/* 1 Production — deep blue-violet */}

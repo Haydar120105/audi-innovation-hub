@@ -78,6 +78,13 @@ export interface ApplicationUpdateInput {
   kpis?: KpiItem[];
 }
 
+export interface AssignedEmployee {
+  name: string;
+  role: string;
+  email: string;
+  department: string;
+}
+
 export interface ApplicationSummary {
   id: string;
   companyName: string;
@@ -89,6 +96,8 @@ export interface ApplicationSummary {
   trackingToken: string;
   notes?: string;
   departmentScores?: DepartmentScore[];
+  assignedEmployee?: AssignedEmployee;
+  ndaStatus?: string; // 'pending_signature' | 'signed'
 }
 
 export type ApplicationStructuredData = { [key: string]: unknown };
@@ -112,6 +121,8 @@ export interface Application {
   requirements?: RequirementItem[] | null;
   milestones?: MilestoneItem[] | null;
   kpis?: KpiItem[] | null;
+  assignedEmployee?: AssignedEmployee | null;
+  ndaStatus?: string | null;
 }
 
 export interface ApplicationTracking {

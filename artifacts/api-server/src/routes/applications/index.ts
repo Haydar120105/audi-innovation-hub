@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, or } from "drizzle-orm";
+import { eq, desc, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, applicationsTable } from "@workspace/db";
 import {
@@ -65,20 +65,33 @@ router.post("/applications", requireAuth, async (req, res): Promise<void> => {
   }
 });
 
-// GET /applications — audi_staff/superuser sees all; applicants see only their own
+// GET /applications
+//   superuser  → all applications
+//   audi_staff → only applications where assignedEmployee.clerkId = their userId
+//   applicant  → only their own submissions
 router.get("/applications", requireAuth, async (req, res): Promise<void> => {
   const userId = getUserId(req)!;
 
-  // Check role via Clerk API (fresh — JWT claims don't include publicMetadata by default)
-  const { clerkClient } = await import("@clerk/express");
-  const clerkUser = await clerkClient.users.getUser(userId);
+  const { createClerkClient } = await import("@clerk/express");
+  const clerkUser = await createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(userId);
   const role = clerkUser.publicMetadata?.["role"] as string | undefined;
-  const isStaffOrAdmin = role === "audi_staff" || role === "superuser";
 
-  if (isStaffOrAdmin) {
+  if (role === "superuser") {
+    // Superuser sees everything
     const apps = await db
       .select()
       .from(applicationsTable)
+      .orderBy(desc(applicationsTable.createdAt));
+    res.json(apps);
+    return;
+  }
+
+  if (role === "audi_staff") {
+    // Staff only sees applications assigned to them via assignedEmployee.clerkId
+    const apps = await db
+      .select()
+      .from(applicationsTable)
+      .where(sql`${applicationsTable.assignedEmployee}->>'clerkId' = ${userId}`)
       .orderBy(desc(applicationsTable.createdAt));
     res.json(apps);
     return;
@@ -137,12 +150,22 @@ router.get("/applications/:id", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
-  // Non-staff can only see their own application
-  const ownerId = getUserId(req);
-  const { clerkClient } = await import("@clerk/express");
-  const clerkUser = await clerkClient.users.getUser(ownerId!);
+  const ownerId = getUserId(req)!;
+  const { createClerkClient } = await import("@clerk/express");
+  const clerkUser = await createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(ownerId);
   const role = clerkUser.publicMetadata?.["role"] as string | undefined;
-  if (role !== "audi_staff" && role !== "superuser" && app.clerkUserId !== ownerId) {
+
+  if (role === "superuser") {
+    // Superuser can see any application
+  } else if (role === "audi_staff") {
+    // Staff can only access applications assigned to them
+    const assignedClerkId = (app.assignedEmployee as Record<string, unknown> | null)?.["clerkId"] as string | undefined;
+    if (assignedClerkId !== ownerId) {
+      res.status(403).json({ error: "Access denied. This application is not assigned to you." });
+      return;
+    }
+  } else if (app.clerkUserId !== ownerId) {
+    // Regular user can only see their own application
     res.status(403).json({ error: "Access denied." });
     return;
   }
@@ -150,12 +173,30 @@ router.get("/applications/:id", requireAuth, async (req, res): Promise<void> => 
   res.json(app);
 });
 
-// PATCH /applications/:id — audi_staff only (replaces DEPARTMENT_WRITE_SECRET)
+// PATCH /applications/:id — audi_staff (only their assigned apps) or superuser
 router.patch("/applications/:id", requireAudiStaff, async (req, res): Promise<void> => {
   const params = GetApplicationParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
+  }
+
+  // Permission check: staff may only patch their own assigned applications
+  const patcherId = getUserId(req)!;
+  const { createClerkClient: cc2 } = await import("@clerk/express");
+  const patcherUser = await cc2({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(patcherId);
+  const patcherRole = patcherUser.publicMetadata?.["role"] as string | undefined;
+
+  if (patcherRole === "audi_staff") {
+    const [existing] = await db
+      .select({ assignedEmployee: applicationsTable.assignedEmployee })
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, params.data.id));
+    const assignedClerkId = (existing?.assignedEmployee as Record<string, unknown> | null)?.["clerkId"] as string | undefined;
+    if (assignedClerkId !== patcherId) {
+      res.status(403).json({ error: "Access denied. This application is not assigned to you." });
+      return;
+    }
   }
 
   const body = UpdateApplicationBody.safeParse(req.body);
@@ -172,6 +213,8 @@ router.patch("/applications/:id", requireAudiStaff, async (req, res): Promise<vo
   if (body.data.requirements !== undefined) updates.requirements = body.data.requirements;
   if (body.data.milestones !== undefined) updates.milestones = body.data.milestones;
   if (body.data.kpis !== undefined) updates.kpis = body.data.kpis;
+  if (body.data.assignedEmployee !== undefined) updates.assignedEmployee = body.data.assignedEmployee;
+  if (body.data.ndaStatus !== undefined) updates.ndaStatus = body.data.ndaStatus;
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No fields to update" });

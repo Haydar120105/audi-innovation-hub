@@ -59,7 +59,7 @@ function CopyButton({ url }: { url: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-medium text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70 transition-all"
+      className="flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-medium text-white/50 border border-white/10 hover:border-white/20 hover:text-white/70 transition-[border-color,color,transform] duration-150 active:scale-[0.97]"
     >
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
         <rect x="4" y="4" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2" />

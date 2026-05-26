@@ -7,6 +7,13 @@
  */
 import type { DepartmentScore } from './departmentScore';
 
+export interface AssignedEmployee {
+  name: string;
+  role: string;
+  email: string;
+  department: string;
+}
+
 export interface ApplicationSummary {
   id: string;
   companyName: string;
@@ -18,4 +25,6 @@ export interface ApplicationSummary {
   trackingToken: string;
   notes?: string;
   departmentScores?: DepartmentScore[];
+  assignedEmployee?: AssignedEmployee;
+  ndaStatus?: string; // 'pending_signature' | 'signed'
 }
