@@ -70,8 +70,8 @@ router.get("/applications", requireAuth, async (req, res): Promise<void> => {
   const userId = getUserId(req)!;
 
   // Check role via Clerk API (fresh — JWT claims don't include publicMetadata by default)
-  const { clerkClient } = await import("@clerk/express");
-  const clerkUser = await clerkClient.users.getUser(userId);
+  const { createClerkClient } = await import("@clerk/express");
+  const clerkUser = await createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(userId);
   const role = clerkUser.publicMetadata?.["role"] as string | undefined;
   const isStaffOrAdmin = role === "audi_staff" || role === "superuser";
 

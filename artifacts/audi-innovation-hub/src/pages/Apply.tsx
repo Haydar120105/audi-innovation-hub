@@ -319,7 +319,8 @@ export default function Apply() {
         if (data.extractedFields && Object.keys(data.extractedFields).length > 0) {
           mergeFields(data.extractedFields);
         }
-      } catch {
+      } catch (err) {
+        console.error("[chat] sendMessage failed:", err);
         setMessages((prev) => [
           ...prev,
           {
@@ -331,7 +332,7 @@ export default function Apply() {
         setIsLoading(false);
       }
     },
-    [messages, collectedFields, isLoading, mergeFields],
+    [messages, collectedFields, isLoading, mergeFields, getToken],
   );
 
   const handlePdfUpload = useCallback(
