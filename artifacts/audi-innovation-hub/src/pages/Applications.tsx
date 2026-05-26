@@ -221,15 +221,28 @@ export function ApplicationsList() {
         {/* Empty */}
         {!isLoading && !error && filtered.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-white/25 text-sm mb-6">
-              {search ? "No applications match your search." : "No applications yet."}
-            </p>
-            <Link href="/apply">
-              <button className="px-5 py-2.5 text-sm font-semibold text-white rounded-sm"
-                style={{ background: AUDI_RED }}>
-                Submit the first application
-              </button>
-            </Link>
+            {search ? (
+              <p className="text-white/25 text-sm">No applications match your search.</p>
+            ) : (apps ?? []).length === 0 ? (
+              <div>
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                    <rect x="3" y="5" width="16" height="13" rx="2" stroke="rgba(255,255,255,0.25)" strokeWidth="1.4" />
+                    <path d="M7 9h8M7 13h5" stroke="rgba(255,255,255,0.2)" strokeWidth="1.4" strokeLinecap="round" />
+                    <path d="M11 1v4" stroke="rgba(255,255,255,0.2)" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <p className="text-white/35 text-sm font-medium mb-2">No applications assigned yet</p>
+                <p className="text-white/20 text-xs max-w-xs mx-auto leading-relaxed">
+                  A superuser needs to assign applications to you. Once assigned, they'll appear here.
+                </p>
+              </div>
+            ) : (
+              <p className="text-white/25 text-sm">No applications match the current filter.</p>
+            )}
           </div>
         )}
 
