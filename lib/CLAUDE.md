@@ -73,16 +73,18 @@ Diese Felder sind in `openapi.yaml` NOCH NICHT, aber im Code vorhanden:
 
 **`lib/api-zod/src/generated/api.ts` — `UpdateApplicationBody`:**
 ```typescript
-rating:       z.number().min(1).max(5).nullable().optional()
-nextStep:     z.string().optional()
-requirements: z.array(z.object({ id: z.string(), text: z.string(), done: z.boolean() })).optional()
-milestones:   z.array(z.object({ id, title, dueDate?, status: 'pending'|'in_progress'|'done' })).optional()
-kpis:         z.array(z.object({ id, metric, target, current, unit? })).optional()
+rating:           z.number().min(1).max(5).nullable().optional()
+nextStep:         z.string().optional()
+requirements:     z.array(z.object({ id: z.string(), text: z.string(), done: z.boolean() })).optional()
+milestones:       z.array(z.object({ id, title, dueDate?, status: 'pending'|'in_progress'|'done' })).optional()
+kpis:             z.array(z.object({ id, metric, target, current, unit? })).optional()
+assignedEmployee: z.object({ name: z.string(), role: z.string(), email: z.string(), department: z.string(), clerkId: z.string() }).optional()
+ndaStatus:        z.string().optional()
 ```
 
 **`lib/api-client-react/src/generated/api.schemas.ts`:**
 - `Application` + `ApplicationUpdateInput` — gleiche Felder wie oben
-- Interfaces: `RequirementItem`, `MilestoneItem`, `KpiItem`
+- Interfaces: `RequirementItem`, `MilestoneItem`, `KpiItem`, `AssignedEmployee`
 
 **Langfristige Lösung:** Diese Felder in `openapi.yaml` eintragen → dann generiert Orval sie automatisch.
 

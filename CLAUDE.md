@@ -51,7 +51,7 @@ Vite proxyt `/api/*` → `localhost:8000` (nur lokal, nicht auf Replit).
 ```
 Browser (React)
   │
-  │  1. POST /api/chat  → Chatbot-Konversation (Claude Tool Use)
+  │  1. POST /api/chat  → Chatbot-Konversation (2-Call-Muster: Extraktion + Reply)
   │  2. POST /api/extract-pdf  → Pitch-Deck hochladen
   │  3. POST /api/applications  → Bewerbung einreichen + KI-Analyse (~20s)
   │
@@ -65,7 +65,7 @@ Express API Server (Port 8000)
   │     └── applicationsTable  ← alles landet hier
   │
   └── Anthropic SDK  →  claude-sonnet-4-6
-        ├── /chat        → Tool Use, extrahiert Felder während Konversation
+        ├── /chat        → Zwei-Call: 1. Tool-Extraktion (forced), 2. Konversations-Antwort
         ├── /extract-pdf → PDF als base64 → Felder aus Pitch Deck
         └── /applications → analyze.ts: Scores (0–100) für 6 Abteilungen + Business Cases
 ```
@@ -76,8 +76,8 @@ Express API Server (Port 8000)
 
 | Rolle | Gesetzt in | Zugang |
 |-------|-----------|--------|
-| `superuser` | Clerk `publicMetadata.role` | Alles: `/admin` + `/applications` + alle Seiten |
-| `audi_staff` | Clerk `publicMetadata.role` | `/applications`, `/departments`, Detail mit Staff-Panel |
+| `superuser` | Clerk `publicMetadata.role` | Alles: `/admin` + `/applications` + alle Seiten; kann Staff zuweisen |
+| `audi_staff` | Clerk `publicMetadata.role` | `/applications` — **nur zugewiesene** Bewerbungen sichtbar |
 | _(kein role)_ | — | Nur eigene Bewerbung: `/apply`, `/dashboard`, `/track/:token` |
 
 **Erste Superuser-Einrichtung:**
@@ -86,20 +86,26 @@ Express API Server (Port 8000)
 
 ### ⚠️ Kritisch: Wie Rollen gelesen werden
 
-**Frontend:** Immer `useUser()` verwenden, NICHT `useAuth()`:
+**Frontend:** `useUser()` für Metadaten, `useAuth()` für Token/Claims:
 ```tsx
+// Rollenprüfung → useUser()
 const { user } = useUser();
 const role = user?.publicMetadata?.["role"] as string | undefined;
+
+// ODER sessionClaims aus useAuth() — funktioniert auch in Home.tsx:
+const { sessionClaims } = useAuth();
+const meta = sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
+const role = meta?.["role"] as string | undefined;
 ```
-`useAuth()` → `sessionClaims` enthält `publicMetadata` NICHT (Clerk JWT-Template ohne publicMetadata).
+`sessionClaims?.["publicMetadata"]` enthält die Rolle nur wenn das Clerk JWT-Template `publicMetadata` einschließt.
 
 **Backend:** Immer Clerk API direkt aufrufen, NICHT JWT-Claims lesen:
 ```typescript
-const { clerkClient } = await import("@clerk/express");
-const clerkUser = await clerkClient.users.getUser(userId);
+const { createClerkClient } = await import("@clerk/express");
+const clerkUser = await createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(userId);
 const role = clerkUser.publicMetadata?.["role"] as string | undefined;
 ```
-Sync-Hilfsfunktionen wie `isAudiStaff(req)` die JWT-Claims lesen → immer falsch, da JWT kein publicMetadata enthält.
+`createClerkClient` ist eine **Funktion** die eine Instanz zurückgibt — immer mit `{ secretKey }` aufrufen.
 
 **Rollenänderung wirkt sofort** (kein Re-Login nötig, da wir direkt Clerk API lesen, nicht JWT-Cache).
 
@@ -146,7 +152,7 @@ Vollständige Doku: siehe **DEPLOYMENT.md**
 
 ## Codegen-Warnung ⚠️
 
-`lib/api-client-react` und `lib/api-zod` wurden **nach dem letzten Codegen-Lauf manuell erweitert** (Staff-Assessment-Felder: `rating`, `nextStep`, `requirements`, `milestones`, `kpis`). Ein neuer Codegen-Lauf überschreibt diese!
+`lib/api-client-react` und `lib/api-zod` wurden **nach dem letzten Codegen-Lauf manuell erweitert** (Staff-Assessment-Felder: `rating`, `nextStep`, `requirements`, `milestones`, `kpis`, `assignedEmployee`, `ndaStatus`). Ein neuer Codegen-Lauf überschreibt diese!
 
 ```bash
 # Codegen (nur wenn openapi.yaml geändert)
@@ -165,9 +171,10 @@ cd lib/api-client-react && npx tsc --build
 - **API-Server kein Hot-Reload** — nach Backend-Änderungen neu starten
 - **esbuild Override `0.27.3`** — wegen Drizzle-Kit, nicht ändern
 - **Port 5000** belegt auf macOS (AirPlay) → API auf Port 8000
-- **JSONB-Felder** (`departmentScores`, `requirements` etc.) immer casten
-- **clerkClient** aus `@clerk/express` ist ein **direktes Objekt** (KEIN Funktionsaufruf!) — `clerkClient.users.getUser(userId)` direkt aufrufen, NICHT `clerkClient()` oder `(clerkClient as any)()`
+- **JSONB-Felder** (`departmentScores`, `requirements`, `assignedEmployee` etc.) immer casten
+- **`createClerkClient`** aus `@clerk/express` ist eine **Fabrik-Funktion** — immer `createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] })` aufrufen und dann `.users.getUser(id)` etc.
 - **Wouter `routing="hash"`** in SignIn/SignUp — Clerk navigiert intern zu Sub-Paths
+- **Audi Staff sieht nur eigene**: `assignedEmployee.clerkId` muss mit der Clerk-ID des Staff-Users übereinstimmen
 
 ---
 
@@ -180,6 +187,8 @@ cd lib/api-client-react && npx tsc --build
 | Neue Frontend-Seite | `artifacts/audi-innovation-hub/src/pages/` + Route in `App.tsx` |
 | UI-Komponente | `artifacts/audi-innovation-hub/src/components/` |
 | API-Typ ändern | `lib/api-spec/openapi.yaml` + Codegen (oder manuell in api-zod + api-client-react) |
-| KI-Prompt ändern | `artifacts/api-server/src/routes/applications/analyze.ts` (Analyse) oder `src/routes/chat.ts` (Chatbot) |
+| KI-Prompt (Chatbot) | `artifacts/api-server/src/routes/chat.ts` → `buildReplyPrompt()` + `SAVE_TOOL` |
+| KI-Prompt (Analyse) | `artifacts/api-server/src/routes/applications/analyze.ts` |
 | Auth-Logik | `artifacts/api-server/src/lib/auth.ts` |
 | Rollen-Management UI | `artifacts/audi-innovation-hub/src/pages/Admin.tsx` |
+| Staff zuweisen + Pipeline | `artifacts/audi-innovation-hub/src/pages/Applications.tsx` → `StaffPanel` |

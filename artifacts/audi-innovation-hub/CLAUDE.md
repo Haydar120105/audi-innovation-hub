@@ -20,10 +20,10 @@ src/
 ├── App.tsx                    ← Router + Route Guards (Protected / AudiStaffOnly / SuperuserOnly)
 ├── index.css                  ← Tailwind v4 + CSS-Variablen (Farben, Fonts)
 ├── pages/
-│   ├── Home.tsx               ← Landingpage: PlantScene + Sections + rollenbasierter Nav
-│   ├── Apply.tsx              ← Chatbot-Bewerbung + PDF-Upload + Submit
-│   ├── Dashboard.tsx          ← Bewerber-Dashboard (eigene Bewerbungen)
-│   ├── Applications.tsx       ← Staff-Dashboard (alle Bewerbungen) + Detail + Staff-Panel
+│   ├── Home.tsx               ← Landingpage: PlantScene + Hint-Strip + Sections + rollenbasierter Nav
+│   ├── Apply.tsx              ← Chatbot-Bewerbung + PDF-Upload + Submit + SuccessScreen
+│   ├── Dashboard.tsx          ← Bewerber-Dashboard (eigene Bewerbungen) mit Gradient-Cards
+│   ├── Applications.tsx       ← Staff-/Superuser-Dashboard: Liste + Detail + StaffPanel + Pipeline
 │   ├── DepartmentPortal.tsx   ← Abteilungsportal (Staff, Legacy Key-Gate)
 │   ├── Track.tsx              ← Öffentlicher Tracking-Link (/track/:token)
 │   ├── SignIn.tsx             ← Clerk <SignIn routing="hash">
@@ -31,10 +31,11 @@ src/
 │   ├── Admin.tsx              ← Superuser: Nutzerverwaltung + Rollenzuweisung
 │   └── not-found.tsx          ← 404
 └── components/
-    ├── PlantScene.tsx         ← Isometrische 3D-Fabrik-Szene (SVG + Framer Motion)
+    ├── PlantScene.tsx         ← Isometrische 3D-Fabrik-Szene (SVG + Framer Motion); kein Hint-Text mehr innen
     ├── FocusAreas.tsx         ← "Was erwartet dich"-Section + Apply-Button
     ├── Benefits.tsx           ← Vorteile-Section
-    └── Testimonials.tsx       ← Testimonials + Partner-Grid + Footer
+    ├── Testimonials.tsx       ← Testimonials + Partner-Grid + Footer
+    └── MoreOpportunities.tsx  ← Weitere Möglichkeiten Section
 ```
 
 ---
@@ -59,20 +60,6 @@ src/
 
 ---
 
-## Neue Seite hinzufügen
-
-```tsx
-// App.tsx
-import MeinePage from "@/pages/MeinePage";
-
-// In Router():
-<Route path="/meine-seite">
-  <Protected><MeinePage /></Protected>
-</Route>
-```
-
----
-
 ## Route Guards (`App.tsx`)
 
 ```tsx
@@ -83,8 +70,8 @@ import MeinePage from "@/pages/MeinePage";
 
 Rolle lesen:
 ```tsx
-const { sessionClaims } = useAuth();
-const role = (sessionClaims?.["publicMetadata"] as any)?.["role"];
+const { user } = useUser();
+const role = user?.publicMetadata?.["role"] as string | undefined;
 const isSuperuser = role === "superuser";
 const isStaff = role === "audi_staff" || isSuperuser;
 ```
@@ -105,6 +92,8 @@ Die Navigation oben rechts ist rollenbasiert:
 - `audi_staff` → `/applications`
 - Bewerber → `/dashboard`
 
+**Hint-Strip (Home.tsx):** "Click a building to explore" erscheint als separater Strip **unterhalb** der PlantScene-Animation (nicht mehr im SVG) — Flex-Container `height: 100svh` mit PlantScene (`flex-1`) + Strip (`flex-shrink-0`) darunter.
+
 ---
 
 ## API-Calls (TanStack Query via `@workspace/api-client-react`)
@@ -113,7 +102,7 @@ Die Navigation oben rechts ist rollenbasiert:
 import { useListApplications, useGetApplication, useUpdateApplication } from "@workspace/api-client-react";
 
 const { data: apps, isLoading } = useListApplications();
-// GET /api/applications — Staff: alle; Bewerber: nur eigene (Backend filtert!)
+// GET /api/applications — Superuser: alle; Staff: nur zugewiesene; Bewerber: nur eigene
 
 const { data: app } = useGetApplication({ id });
 // GET /api/applications/:id
@@ -136,6 +125,7 @@ const { mutateAsync: update } = useUpdateApplication();
 - **MovingF1Car:** Formel-1-Wagen auf dem äußeren F1_TRACK (28s, Audi-Rot `#BB0A21`)
 - **Farbpalette:** Dunkel/Futuristisch — Hintergrund `#1A0D30→#0C0A1E→#0A0808`, Gebäude blau-violett/crimson/teal/navy
 - **Audi-Logo:** `filter: brightness(0) invert(1)` → immer weiß
+- **Kein Hint-Text innen** — der "Click a building to explore"-Strip ist jetzt in Home.tsx
 
 ---
 
@@ -174,30 +164,42 @@ const { mutateAsync: update } = useUpdateApplication();
 ## Apply-Chatbot (`pages/Apply.tsx`)
 
 ```
-State: messages[], collectedFields{}, isLoading, isSubmitting
+State: messages[], collectedFields{}, currentField: string, isLoading, isSubmitting
 
-1. User schreibt → POST /api/chat { messages, collectedFields }
-   ← { reply: string, extractedFields: {} }
-   → Felder mergen, FieldProgress-Bar aktualisieren
+1. Bot startet sofort mit erster Frage: "What's the name of your startup?"
 
-2. Optional: PDF hochladen → POST /api/extract-pdf
+2. User schreibt → POST /api/chat { messages, collectedFields }
+   ← { reply: string, extractedFields: {}, currentField: string|null }
+   → collectedFields mergen, currentField setzen, FieldProgress-Bar aktualisieren
+
+3. Quick-Reply-Chips: nur anzeigen wenn currentField in FIELD_SUGGESTIONS
+   (stage → pre-seed/seed/...; teamSize → 1-5/6-15/...; targetDepartments → Multi-Select)
+   Chips werden vom Backend-currentField gesteuert — nie aus Frontend-Eigenlogik!
+
+4. Optional: PDF hochladen → POST /api/extract-pdf
    ← { extracted: {}, found: [], missing: [] }
    → Bot bestätigt gefundene Felder
 
-3. Wenn alle 7 Pflichtfelder gesammelt:
+5. Wenn alle 7 Pflichtfelder gesammelt:
    → Submit-Button erscheint inline im Chat
    → POST /api/applications { companyName, transcript, ...felder }
    ← Application mit departmentScores
-   → SuccessScreen: Tracking-Link + Top-3-Abteilungs-Matches
+
+6. SuccessScreen: Tracking-Link + Top-3-Abteilungs-Matches +
+   "Was passiert als nächstes"-Timeline (01 Review, 02 Matching, 03 Pitch) +
+   "← Back to Dashboard"-Button
 ```
+
+**Pflichtfelder (7):** `companyName`, `problem`, `solution`, `technology`, `stage`, `teamSize`, `targetDepartments`
 
 ---
 
 ## Bewerber-Dashboard (`pages/Dashboard.tsx`)
 
-- Nutzt `useListApplications()` — Backend gibt automatisch nur eigene zurück
-- **Pipeline-Timeline:** Submitted → Analysis → Shortlisted → Accepted (rot gefüllt)
-- **Stats-Strip:** Eingereicht / In Bearbeitung / Akzeptiert
+- Gradient-Hintergrund (`#0A0A14` → leicht aufgehellt)
+- `StatCard`-Komponente für Statistiken (Eingereicht / In Bearbeitung / Akzeptiert)
+- **Pipeline-Timeline:** Submitted → Analysis → Shortlisted → Accepted (Audi-Rot gefüllt)
+- **Rounded-xl Cards** mit leichtem Glow bei Hover
 - **Track-Link:** direkt zu `/track/:trackingToken`
 - **Empty State:** Direkt zu `/apply`
 
@@ -207,8 +209,9 @@ State: messages[], collectedFields{}, isLoading, isSubmitting
 
 **ApplicationsList:** Stat-Karten → Filter-Tabs → Such-Input → Tabelle → Klick auf Zeile → Detail
 
-**ApplicationDetail + StaffPanel** (nur für staff):
-- Pipeline-Status Dropdown
+**ApplicationDetail + StaffPanel** (Staff + Superuser):
+- **Pipeline-Stepper:** `PIPELINE_STEPS` Array mit Farben; aktiver Schritt leuchtet, abgeschlossene haben Häkchen
+- **"Advance to X"**-Button → setzt Status auf nächsten Schritt + auto-speichert
 - Rating (1–5 Sterne, anklickbar)
 - Internal Notes (Textarea)
 - Next Step (Text)
@@ -216,6 +219,12 @@ State: messages[], collectedFields{}, isLoading, isSubmitting
 - Milestones (Titel + Datum + Status)
 - KPIs (Metric / Target / Current / Unit)
 - "Save All Changes" → PATCH /api/applications/:id
+
+**Staff-Zuweisung (nur Superuser):**
+- Dropdown mit allen `audi_staff`-Usern (geladen von `/api/admin/users`)
+- Bei Auswahl: Name/E-Mail automatisch befüllt, Role/Department-Felder erscheinen
+- `assignedEmployee.clerkId` wird mit gespeichert — steuert, welche Apps der Staff sieht
+- Staff ohne Zuweisung sieht "No applications assigned yet"-Empty-State
 
 ---
 
