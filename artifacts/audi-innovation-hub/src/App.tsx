@@ -113,6 +113,15 @@ function DashboardRouter() {
   return <ApplicantDashboard />;
 }
 
+/** Scrolls window to top on every route change. */
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -170,6 +179,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={base}>
+            <ScrollToTop />
             <Router />
           </WouterRouter>
           <Toaster />

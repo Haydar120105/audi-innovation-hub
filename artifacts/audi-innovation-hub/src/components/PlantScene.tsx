@@ -479,9 +479,6 @@ export default function PlantScene() {
   const [, navigate] = useLocation();
   const selected = DEPARTMENTS.find(d => d.id === activeDept) ?? null;
 
-  // All paths are closed loops — last point == first point
-  const loopRed: [number, number][]   = [[-2,0],[0,0],[2,0],[4,0],[5,0],[5,1.5],[5,3],[4,3],[2,3],[0,3],[-2,3],[-2,1.5],[-2,0]];
-  const loopBlue: [number, number][]  = [[5,3],[5,1.5],[5,0],[4,0],[2,0],[0,0],[-2,0],[-2,1.5],[-2,3],[0,3],[2,3],[4,3],[5,3]];
   // Inner figure-8: down x=1, cross bottom, up x=3, cross top, back to start
   const loopBlack: [number, number][] = [[1,-1],[1,0],[1,1.5],[1,3],[1,4],[2,4],[3,4],[3,3],[3,1.5],[3,0],[3,-1],[2,-1],[1,-1]];
 
@@ -570,16 +567,7 @@ export default function PlantScene() {
         ].map(p => p.join(",")).join(" ")} />
 
 
-        {/* Roads */}
-        {([
-          [[-2.2, -0.15], [5.2, -0.15], [5.2, 0.15], [-2.2, 0.15]],
-          [[-2.2, 2.85], [5.2, 2.85], [5.2, 3.15], [-2.2, 3.15]],
-          [[-2.15, 0], [-1.85, 0], [-1.85, 3], [-2.15, 3]],
-          [[4.85, 0], [5.15, 0], [5.15, 3], [4.85, 3]],
-        ] as [number, number][][]).map((pts, i) => (
-          <polygon key={i} fill="#1A1832"
-            points={pts.map(([px, py]) => `${isoX(px, py)},${isoY(px, py, 0.02)}`).join(" ")} />
-        ))}
+        {/* Inner factory roads only */}
         {([
           [[0.85, -1], [1.15, -1], [1.15, 4], [0.85, 4]],
           [[2.85, -1], [3.15, -1], [3.15, 4], [2.85, 4]],
@@ -588,11 +576,7 @@ export default function PlantScene() {
             points={pts.map(([px, py]) => `${isoX(px, py)},${isoY(px, py, 0.02)}`).join(" ")} />
         ))}
 
-        {/* Road cars — outer loop (CCW red, CW blue) */}
-        <MovingCar path={loopRed}   duration={18} delay={0}    color="#7A1018" />
-        <MovingCar path={loopBlue}  duration={20} delay={5}    color="#0E2E58" />
-        <MovingCar path={loopRed}   duration={18} delay={11}   color="#1A1A40" />
-        {/* Road cars — inner factory roads (loopBlack) */}
+        {/* Road cars — inner factory roads only */}
         <MovingCar path={loopBlack} duration={13} delay={1}    color="#3A3A52" />
         <MovingCar path={loopBlack} duration={13} delay={4.8}  color="#1E3820" />
         <MovingCar path={loopBlack} duration={13} delay={8.5}  color="#502010" />
