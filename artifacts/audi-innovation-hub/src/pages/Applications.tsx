@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import { useAuth } from "@clerk/clerk-react";
 import { UserButton } from "@clerk/clerk-react";
@@ -341,7 +341,8 @@ export function ApplicationDetail() {
   });
 
   const meta = sessionClaims?.["publicMetadata"] as Record<string, unknown> | undefined;
-  const isStaff = isLoaded && meta?.["role"] === "audi_staff";
+  const isSuperuser = isLoaded && meta?.["role"] === "superuser";
+  const isStaff = isLoaded && (meta?.["role"] === "audi_staff" || isSuperuser);
 
   const save = useCallback(
     (fields: Parameters<typeof patch>[0]["data"]) => {
@@ -487,9 +488,9 @@ export function ApplicationDetail() {
           </div>
         )}
 
-        {/* Staff actions panel — only for audi_staff */}
+        {/* Staff / superuser actions panel */}
         {isStaff && (
-          <StaffPanel app={app} onSave={save} />
+          <StaffPanel app={app} onSave={save} isSuperuser={isSuperuser} />
         )}
 
         {!structured && cases.length === 0 && scores.length === 0 && (
@@ -539,13 +540,33 @@ function CopyButton({ text }: { text: string }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // STAFF PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
+// Pipeline steps shared between superuser stepper and status select
+const PIPELINE_STEPS = [
+  { status: "pending",     label: "Pending",     color: "#d97706" },
+  { status: "routed",      label: "Analysed",    color: "#3b82f6" },
+  { status: "shortlisted", label: "Shortlisted", color: "#8b5cf6" },
+  { status: "accepted",    label: "Accepted",    color: "#16a34a" },
+];
+
+interface StaffUserLite {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  imageUrl: string;
+}
+
 function StaffPanel({
   app,
   onSave,
+  isSuperuser = false,
 }: {
-  app: { status: string; rating?: number | null; notes?: string | null; nextStep?: string | null; requirements?: RequirementItem[] | null; milestones?: MilestoneItem[] | null; kpis?: KpiItem[] | null; assignedEmployee?: { name: string; role: string; email: string; department: string } | null; ndaStatus?: string | null };
+  app: { status: string; rating?: number | null; notes?: string | null; nextStep?: string | null; requirements?: RequirementItem[] | null; milestones?: MilestoneItem[] | null; kpis?: KpiItem[] | null; assignedEmployee?: { name: string; role: string; email: string; department: string; clerkId?: string } | null; ndaStatus?: string | null };
   onSave: (data: Record<string, unknown>) => void;
+  isSuperuser?: boolean;
 }) {
+  const { getToken } = useAuth();
+
   const [status, setStatus] = useState(app.status);
   const [rating, setRating] = useState<number>(app.rating ?? 0);
   const [notes, setNotes] = useState(app.notes ?? "");
@@ -555,18 +576,64 @@ function StaffPanel({
   const [kpis, setKpis] = useState<KpiItem[]>(app.kpis ?? []);
   const [saved, setSaved] = useState(false);
 
-  // Onboarding fields
+  // Onboarding / assignment fields
   const [empName, setEmpName] = useState(app.assignedEmployee?.name ?? "");
   const [empRole, setEmpRole] = useState(app.assignedEmployee?.role ?? "");
   const [empEmail, setEmpEmail] = useState(app.assignedEmployee?.email ?? "");
   const [empDept, setEmpDept] = useState(app.assignedEmployee?.department ?? "");
   const [ndaStatus, setNdaStatus] = useState<string>(app.ndaStatus ?? "pending_signature");
 
+  // Superuser: Clerk staff users
+  const [staffUsers, setStaffUsers] = useState<StaffUserLite[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [pickedStaffId, setPickedStaffId] = useState(app.assignedEmployee?.clerkId ?? "");
+
+  // Load Clerk staff users for superuser picker
+  useEffect(() => {
+    if (!isSuperuser) return;
+    setStaffLoading(true);
+    getToken()
+      .then(token =>
+        fetch("/api/admin/users", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }),
+      )
+      .then(r => r.json())
+      .then((users: StaffUserLite[] & { role?: string }[]) =>
+        setStaffUsers(users.filter((u: any) => u.role === "audi_staff")),
+      )
+      .catch(console.error)
+      .finally(() => setStaffLoading(false));
+  }, [isSuperuser, getToken]);
+
+  // Pipeline advance helpers
+  const currentStepIdx = PIPELINE_STEPS.findIndex(s => s.status === status);
+  const nextPipelineStep =
+    currentStepIdx >= 0 && currentStepIdx < PIPELINE_STEPS.length - 1
+      ? PIPELINE_STEPS[currentStepIdx + 1]
+      : null;
+
   const triggerSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
+
+  const handleAdvance = () => {
+    if (!nextPipelineStep) return;
+    const newStatus = nextPipelineStep.status;
+    setStatus(newStatus);
+    onSave({ status: newStatus });
+    triggerSaved();
+  };
+
+  const handlePickStaff = (userId: string) => {
+    setPickedStaffId(userId);
+    const user = staffUsers.find(u => u.id === userId);
+    if (!user) { setEmpName(""); setEmpEmail(""); return; }
+    setEmpName(`${user.firstName} ${user.lastName}`.trim() || user.email);
+    setEmpEmail(user.email);
+  };
 
   const handleSave = () => {
     const assignedEmployee = empName && empRole && empEmail && empDept
-      ? { name: empName, role: empRole, email: empEmail, department: empDept }
+      ? { name: empName, role: empRole, email: empEmail, department: empDept, clerkId: pickedStaffId || undefined }
       : null;
     onSave({ status, rating: rating || null, notes, nextStep, requirements: reqs, milestones, kpis, assignedEmployee, ndaStatus: ndaStatus || null });
     triggerSaved();
@@ -611,6 +678,194 @@ function StaffPanel({
           {saved ? "✓ Saved" : "Save Changes"}
         </button>
       </div>
+
+      {/* ── Superuser admin controls ── */}
+      {isSuperuser && (
+        <div
+          className="rounded-sm overflow-hidden"
+          style={{ border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.03)" }}
+        >
+          {/* Header */}
+          <div
+            className="px-5 py-3 flex items-center gap-2"
+            style={{ borderBottom: "1px solid rgba(245,158,11,0.15)" }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f59e0b" }} />
+            <p className="text-xs font-semibold" style={{ color: "#f59e0b" }}>
+              Admin Controls — Superuser Only
+            </p>
+          </div>
+
+          <div className="p-5 space-y-6">
+            {/* ── Pipeline stepper ── */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-4">
+                Advance to Next Round
+              </p>
+
+              {/* Step indicators */}
+              <div className="flex items-center mb-5">
+                {PIPELINE_STEPS.map((step, idx) => {
+                  const isActive = step.status === status;
+                  const isDone = idx < currentStepIdx;
+                  return (
+                    <div key={step.status} className="flex items-center flex-1 last:flex-none">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all duration-300"
+                          style={{
+                            background: isActive
+                              ? step.color
+                              : isDone
+                                ? "rgba(255,255,255,0.12)"
+                                : "rgba(255,255,255,0.05)",
+                            color: isActive ? "#fff" : isDone ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.2)",
+                            border: `1.5px solid ${isActive ? step.color : isDone ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.07)"}`,
+                            boxShadow: isActive ? `0 0 14px ${step.color}50` : "none",
+                          }}
+                        >
+                          {isDone ? (
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                              <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : (
+                            idx + 1
+                          )}
+                        </div>
+                        <p
+                          className="text-[9px] mt-1.5 font-semibold tracking-wide"
+                          style={{ color: isActive ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.22)" }}
+                        >
+                          {step.label.toUpperCase()}
+                        </p>
+                      </div>
+                      {idx < PIPELINE_STEPS.length - 1 && (
+                        <div
+                          className="flex-1 h-px mx-2 mb-4 transition-[background-color] duration-300"
+                          style={{
+                            background: idx < currentStepIdx
+                              ? "rgba(255,255,255,0.18)"
+                              : "rgba(255,255,255,0.07)",
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Advance button */}
+              {nextPipelineStep ? (
+                <button
+                  onClick={handleAdvance}
+                  className="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-sm text-sm font-semibold text-white transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.98]"
+                  style={{ background: nextPipelineStep.color }}
+                >
+                  Advance to
+                  <span className="font-bold">{nextPipelineStep.label}</span>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M3 7h8M8 3l4 4-4 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : (
+                <div
+                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-sm"
+                  style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.2)" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2.5 7l3 3 6-6" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <p className="text-xs font-semibold" style={{ color: "#16a34a" }}>
+                    Final stage reached — application is Accepted
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Assign Audi Staff Member ── */}
+            <div>
+              <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-3">
+                Assign Audi Staff Member
+              </p>
+
+              {staffLoading ? (
+                <div className="flex items-center gap-2 py-2">
+                  <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "#f59e0b transparent transparent transparent" }} />
+                  <p className="text-white/30 text-xs">Loading staff users…</p>
+                </div>
+              ) : staffUsers.length === 0 ? (
+                <p className="text-white/25 text-xs leading-relaxed">
+                  No Audi staff users found. Assign the <code className="font-mono text-[10px] bg-white/5 px-1 rounded">audi_staff</code> role to users in the Admin panel first.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {/* Picker */}
+                  <select
+                    value={pickedStaffId}
+                    onChange={e => handlePickStaff(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-sm text-sm text-white outline-none"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    <option value="">— Select a staff member —</option>
+                    {staffUsers.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {`${u.firstName} ${u.lastName}`.trim() || u.email}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Preview card */}
+                  {pickedStaffId && (() => {
+                    const picked = staffUsers.find(u => u.id === pickedStaffId);
+                    return (
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 rounded-sm"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
+                      >
+                        {picked?.imageUrl ? (
+                          <img src={picked.imageUrl} className="w-9 h-9 rounded-full flex-shrink-0 object-cover" alt="" />
+                        ) : (
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}
+                          >
+                            {empName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-white text-sm font-semibold">{empName || "—"}</p>
+                          <p className="text-white/35 text-xs">{empEmail}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Role + Department (editable after picking) */}
+                  {pickedStaffId && (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {[
+                        { label: "Role / Title", value: empRole, setter: setEmpRole, ph: "e.g. Innovation Manager" },
+                        { label: "Department", value: empDept, setter: setEmpDept, ph: "e.g. R&D Partnerships" },
+                      ].map(({ label, value, setter, ph }) => (
+                        <div key={label}>
+                          <p className="text-white/25 text-[10px] font-semibold uppercase tracking-wide mb-1">{label}</p>
+                          <input
+                            value={value}
+                            onChange={e => setter(e.target.value)}
+                            placeholder={ph}
+                            className="w-full px-3 py-2 rounded-sm text-sm text-white placeholder-white/20 outline-none"
+                            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Row 1: Status + Rating */}
       <div className="grid grid-cols-2 gap-4">
