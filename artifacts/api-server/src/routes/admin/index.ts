@@ -1,6 +1,12 @@
 import { Router, type IRouter } from "express";
 import { createClerkClient } from "@clerk/express";
 import { requireSuperuser, CLERK_ENABLED } from "../../lib/auth";
+import { db, hubConfigTable } from "@workspace/db";
+import {
+  DEFAULT_FOCUS_AREAS,
+  DEFAULT_FIELD_QUESTIONS,
+  DEFAULT_SYSTEM_PROMPT_INTRO,
+} from "../hub-config-defaults";
 
 const VALID_ROLES = new Set(["superuser", "audi_staff", "applicant", ""]);
 
@@ -68,6 +74,59 @@ router.delete("/admin/users/:userId", requireSuperuser, async (req, res): Promis
 
   await clerk().users.deleteUser(userId);
   res.json({ ok: true, userId });
+});
+
+// ─── Hub Config ───────────────────────────────────────────────────────────────
+
+const ALLOWED_CONFIG_KEYS = new Set(["focus_areas", "chat_questions", "chat_system_prompt"]);
+
+/**
+ * GET /admin/config — returns all config keys with defaults filled in for missing rows.
+ * Superuser only.
+ */
+router.get("/admin/config", requireSuperuser, async (_req, res): Promise<void> => {
+  const rows = await db.select().from(hubConfigTable);
+  const map: Record<string, unknown> = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+
+  res.json({
+    focus_areas:        map["focus_areas"]        ?? DEFAULT_FOCUS_AREAS,
+    chat_questions:     map["chat_questions"]      ?? DEFAULT_FIELD_QUESTIONS,
+    chat_system_prompt: map["chat_system_prompt"]  ?? { intro: DEFAULT_SYSTEM_PROMPT_INTRO },
+  });
+});
+
+/**
+ * PUT /admin/config/:key — upsert a single config key.
+ * Body: { value: unknown }
+ * Superuser only.
+ */
+router.put("/admin/config/:key", requireSuperuser, async (req, res): Promise<void> => {
+  const { key } = req.params;
+
+  if (!ALLOWED_CONFIG_KEYS.has(key)) {
+    res.status(400).json({ error: `Unknown config key: "${key}". Allowed: ${[...ALLOWED_CONFIG_KEYS].join(", ")}` });
+    return;
+  }
+
+  const { value } = req.body as { value?: unknown };
+  if (value === undefined) {
+    res.status(400).json({ error: "Request body must contain a 'value' field" });
+    return;
+  }
+
+  const [row] = await db
+    .insert(hubConfigTable)
+    .values({ key, value: value as unknown as Record<string, unknown> })
+    .onConflictDoUpdate({
+      target: hubConfigTable.key,
+      set: {
+        value: value as unknown as Record<string, unknown>,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  res.json(row);
 });
 
 export default router;

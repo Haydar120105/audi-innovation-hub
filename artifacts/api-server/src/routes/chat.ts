@@ -1,6 +1,12 @@
 import { Router } from "express";
+import { inArray } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { db, hubConfigTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import {
+  DEFAULT_FIELD_QUESTIONS,
+  DEFAULT_SYSTEM_PROMPT_INTRO,
+} from "./hub-config-defaults";
 
 const router = Router();
 
@@ -23,22 +29,58 @@ const REQUIRED_FIELDS = [
   "targetDepartments",
 ];
 
-const FIELD_QUESTIONS: Record<string, string> = {
-  companyName: "What's the name of your startup?",
-  problem: "What problem are you solving, and who are your target customers?",
-  solution: "How does your solution work — what do you actually build or offer?",
-  technology: "What's the core technology behind it, and what makes it defensible or unique?",
-  stage: "What stage is your company at right now — pre-seed, seed, Series A, or further along?",
-  teamSize: "How many people are on your team, and what are the key areas of expertise?",
-  targetDepartments:
-    "Which Audi departments do you think you could collaborate with most effectively? We have: Production & Manufacturing, R&D, Design Studio, Logistics & Supply Chain, Sales & Customer Experience, and Digital & IT.",
-};
+// ── In-memory config cache (60 s TTL) ────────────────────────────────────────
+interface ChatConfig {
+  questions: Record<string, string>;
+  systemPromptIntro: string;
+  cachedAt: number;
+}
 
+let chatConfigCache: ChatConfig | null = null;
+const CACHE_TTL = 60_000;
+
+async function loadChatConfig(): Promise<Omit<ChatConfig, "cachedAt">> {
+  if (chatConfigCache && Date.now() - chatConfigCache.cachedAt < CACHE_TTL) {
+    return chatConfigCache;
+  }
+
+  try {
+    const rows = await db
+      .select()
+      .from(hubConfigTable)
+      .where(inArray(hubConfigTable.key, ["chat_questions", "chat_system_prompt"]));
+
+    let questions: Record<string, string> = { ...DEFAULT_FIELD_QUESTIONS };
+    let systemPromptIntro = DEFAULT_SYSTEM_PROMPT_INTRO;
+
+    for (const row of rows) {
+      if (row.key === "chat_questions") {
+        // Merge: DB values override defaults, allowing partial overrides
+        questions = { ...questions, ...(row.value as Record<string, string>) };
+      } else if (row.key === "chat_system_prompt") {
+        const val = row.value as { intro?: string };
+        if (val?.intro) systemPromptIntro = val.intro;
+      }
+    }
+
+    chatConfigCache = { questions, systemPromptIntro, cachedAt: Date.now() };
+    return chatConfigCache;
+  } catch {
+    // DB unavailable → return hardcoded defaults silently
+    return { questions: DEFAULT_FIELD_QUESTIONS, systemPromptIntro: DEFAULT_SYSTEM_PROMPT_INTRO };
+  }
+}
+
+// ── Reply prompt builder ──────────────────────────────────────────────────────
 /**
  * Builds the system prompt for the REPLY step.
  * collectedFields must already include anything just extracted in the extraction step.
  */
-function buildReplyPrompt(collectedFields: Record<string, unknown>): string {
+function buildReplyPrompt(
+  collectedFields: Record<string, unknown>,
+  questions: Record<string, string>,
+  systemPromptIntro: string,
+): string {
   const missing = REQUIRED_FIELDS.filter((f) => !collectedFields[f]);
   const collected = REQUIRED_FIELDS.filter((f) => collectedFields[f]);
 
@@ -48,9 +90,9 @@ function buildReplyPrompt(collectedFields: Record<string, unknown>): string {
       : "none yet";
 
   const nextField = missing[0] ?? null;
-  const nextQuestion = nextField ? FIELD_QUESTIONS[nextField] : null;
+  const nextQuestion = nextField ? (questions[nextField] ?? DEFAULT_FIELD_QUESTIONS[nextField]) : null;
 
-  return `You are the official AI assistant for the Audi Innovation Hub — Audi AG's startup collaboration program.
+  return `${systemPromptIntro}
 
 ## Information already collected
 ${collectedSummary}
@@ -76,6 +118,7 @@ ${
 - What happens after submission (2-week review → pitch invitation if shortlisted)`;
 }
 
+// ── Tool definition ───────────────────────────────────────────────────────────
 const SAVE_TOOL = {
   name: "save_startup_info",
   description:
@@ -112,6 +155,7 @@ const SAVE_TOOL = {
   },
 };
 
+// ── Route ─────────────────────────────────────────────────────────────────────
 router.post("/chat", requireAuth, async (req, res): Promise<void> => {
   const { messages, collectedFields = {} } = req.body as {
     messages: Array<{ role: string; content: string }>;
@@ -128,6 +172,9 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
+
+    // Load config (DB with 60 s cache, falls back to hardcoded defaults)
+    const { questions, systemPromptIntro } = await loadChatConfig();
 
     // ── STEP 1: Extraction ────────────────────────────────────────────────────
     // Force a tool call so we always know what was just mentioned.
@@ -160,7 +207,7 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
     // Build prompt with merged fields — extraction already happened, so this
     // prompt accurately knows what's still missing and asks for the right thing.
     const mergedFields = { ...collectedFields, ...extractedFields };
-    const replyPrompt = buildReplyPrompt(mergedFields);
+    const replyPrompt = buildReplyPrompt(mergedFields, questions, systemPromptIntro);
 
     const replyRes = await anthropic.messages.create({
       model: "claude-sonnet-4-6",

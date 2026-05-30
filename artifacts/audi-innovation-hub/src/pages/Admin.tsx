@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { UserButton, useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -87,6 +87,44 @@ async function patchUserRole(
   if (!res.ok) throw new Error(await res.text());
 }
 
+// ─── Config types + helpers ───────────────────────────────────────────────────
+interface FocusArea { title: string; topics: string[]; isWildcard?: boolean }
+interface HubConfig {
+  focus_areas: FocusArea[];
+  chat_questions: Record<string, string>;
+  chat_system_prompt: { intro: string };
+}
+
+const CHAT_FIELD_LABELS: Record<string, string> = {
+  companyName: "Company Name",
+  problem: "Problem & Customers",
+  solution: "Solution",
+  technology: "Technology",
+  stage: "Stage",
+  teamSize: "Team Size",
+  targetDepartments: "Target Departments",
+};
+
+async function fetchConfig(token: string | null): Promise<HubConfig> {
+  const res = await fetch("/api/admin/config", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function putConfig(key: string, value: unknown, token: string | null): Promise<void> {
+  const res = await fetch(`/api/admin/config/${key}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ value }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { getToken } = useAuth();
@@ -96,6 +134,18 @@ export default function AdminDashboard() {
   const [pendingRole, setPendingRole] = useState<Record<string, string | null>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // ── Content management state ──────────────────────────────────────────────
+  const [focusAreas, setFocusAreas] = useState<FocusArea[]>([]);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<{ title: string; topics: string; isWildcard: boolean }>({ title: "", topics: "", isWildcard: false });
+  const [savingFocus, setSavingFocus] = useState(false);
+  const [focusSavedOk, setFocusSavedOk] = useState(false);
+
+  const [chatQuestions, setChatQuestions] = useState<Record<string, string>>({});
+  const [chatIntro, setChatIntro] = useState("");
+  const [savingChat, setSavingChat] = useState(false);
+  const [chatSavedOk, setChatSavedOk] = useState(false);
 
   // ── Applications overview (superuser can see all) ──────────────────────────
   const { data: apps = [] } = useListApplications();
@@ -114,6 +164,22 @@ export default function AdminDashboard() {
       return fetchUsers(token);
     },
   });
+
+  const { data: configData } = useQuery<HubConfig>({
+    queryKey: ["admin-config"],
+    queryFn: async () => {
+      const token = await getToken();
+      return fetchConfig(token);
+    },
+  });
+
+  // Populate editing state once config loads
+  useEffect(() => {
+    if (!configData) return;
+    setFocusAreas(configData.focus_areas ?? []);
+    setChatQuestions(configData.chat_questions ?? {});
+    setChatIntro(configData.chat_system_prompt?.intro ?? "");
+  }, [configData]);
 
   const roleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string | null }) => {
@@ -145,6 +211,36 @@ export default function AdminDashboard() {
       setConfirmDelete(null);
     },
   });
+
+  // ── Content save handlers ─────────────────────────────────────────────────
+  async function saveFocusAreas() {
+    setSavingFocus(true);
+    try {
+      const token = await getToken();
+      await putConfig("focus_areas", focusAreas, token);
+      setFocusSavedOk(true);
+      setTimeout(() => setFocusSavedOk(false), 2500);
+      qc.invalidateQueries({ queryKey: ["admin-config"] });
+    } finally {
+      setSavingFocus(false);
+    }
+  }
+
+  async function saveChatConfig() {
+    setSavingChat(true);
+    try {
+      const token = await getToken();
+      await Promise.all([
+        putConfig("chat_questions", chatQuestions, token),
+        putConfig("chat_system_prompt", { intro: chatIntro }, token),
+      ]);
+      setChatSavedOk(true);
+      setTimeout(() => setChatSavedOk(false), 2500);
+      qc.invalidateQueries({ queryKey: ["admin-config"] });
+    } finally {
+      setSavingChat(false);
+    }
+  }
 
   const filtered = users.filter((u) => {
     const matchSearch = !search ||
@@ -250,7 +346,7 @@ export default function AdminDashboard() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18, duration: 0.5 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-10"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-10"
         >
           {/* Applications */}
           <Link href="/applications">
@@ -321,6 +417,32 @@ export default function AdminDashboard() {
                 {stats.total} Nutzer · {stats.staff} Staff · {stats.superuser} Superuser
               </p>
               <div className="mt-3 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(245,158,11,0.4), transparent)" }} />
+            </div>
+          </a>
+
+          {/* Content Management anchor */}
+          <a href="#content-management">
+            <div className="group p-5 rounded-sm cursor-pointer transition-[border-color,background-color] duration-200 hover:border-white/15"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-9 h-9 rounded-sm flex items-center justify-center"
+                  style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.22)" }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="2" width="5" height="5" rx="0.8" stroke="#8b5cf6" strokeWidth="1.4"/>
+                    <rect x="9" y="2" width="5" height="5" rx="0.8" stroke="#8b5cf6" strokeWidth="1.4"/>
+                    <rect x="2" y="9" width="5" height="5" rx="0.8" stroke="#8b5cf6" strokeWidth="1.4"/>
+                    <path d="M11.5 9.5v4M9.5 11.5h4" stroke="#8b5cf6" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mt-1 opacity-30 group-hover:opacity-60 transition-opacity">
+                  <path d="M7 3v8M4 8l3 3 3-3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p className="text-white font-semibold text-sm mb-1">Content Management</p>
+              <p className="text-white/35 text-xs leading-relaxed">
+                Focus Areas · Chat-Fragen · System-Prompt
+              </p>
+              <div className="mt-3 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(139,92,246,0.4), transparent)" }} />
             </div>
           </a>
         </motion.div>
@@ -544,6 +666,197 @@ export default function AdminDashboard() {
             })}
           </div>
         )}
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* Content Management                                                    */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        <div id="content-management" className="mt-16 pt-2">
+          <p className="text-[10px] tracking-[0.2em] font-semibold uppercase text-white/25 mb-1">Inhalte verwalten</p>
+          <p className="text-white/30 text-xs mb-8">
+            Änderungen sind live sobald gespeichert — kein Redeploy nötig.
+          </p>
+        </div>
+
+        {/* ── Focus Areas Editor ── */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-white text-sm font-semibold">Focus Areas</p>
+              <p className="text-white/30 text-xs mt-0.5">Erscheinen auf der Homepage unter „Fields of Interest"</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {focusSavedOk && <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>✓ Gespeichert</span>}
+              <button
+                onClick={saveFocusAreas}
+                disabled={savingFocus}
+                className="px-4 py-2 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
+                style={{ background: AUDI_RED, color: "#fff", opacity: savingFocus ? 0.6 : 1 }}
+              >
+                {savingFocus ? "Speichern…" : "Focus Areas speichern"}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {focusAreas.map((area, idx) => (
+              <div key={idx} className="rounded-sm" style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.025)" }}>
+                {editingIdx === idx ? (
+                  /* ── Inline edit form ── */
+                  <div className="p-4 flex flex-col gap-3">
+                    <input
+                      value={editDraft.title}
+                      onChange={e => setEditDraft(d => ({ ...d, title: e.target.value }))}
+                      placeholder="Titel"
+                      className="w-full px-3 py-2 rounded-sm text-sm text-white placeholder-white/25 outline-none"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                    />
+                    <input
+                      value={editDraft.topics}
+                      onChange={e => setEditDraft(d => ({ ...d, topics: e.target.value }))}
+                      placeholder="Topics (kommagetrennt)"
+                      className="w-full px-3 py-2 rounded-sm text-sm text-white placeholder-white/25 outline-none"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                    />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editDraft.isWildcard}
+                        onChange={e => setEditDraft(d => ({ ...d, isWildcard: e.target.checked }))}
+                        className="accent-[#BB0A21]"
+                      />
+                      <span className="text-xs text-white/50">Open Category / Wildcard-Karte</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const updated = focusAreas.map((a, i) =>
+                            i === idx
+                              ? { title: editDraft.title, topics: editDraft.topics.split(",").map(t => t.trim()).filter(Boolean), isWildcard: editDraft.isWildcard || undefined }
+                              : a
+                          );
+                          setFocusAreas(updated);
+                          setEditingIdx(null);
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-sm text-white"
+                        style={{ background: AUDI_RED }}
+                      >
+                        ✓ Übernehmen
+                      </button>
+                      <button
+                        onClick={() => setEditingIdx(null)}
+                        className="px-3 py-1.5 text-xs rounded-sm text-white/40 hover:text-white/70 transition-colors"
+                        style={{ background: "rgba(255,255,255,0.05)" }}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Read-only row ── */
+                  <div className="px-4 py-3 flex items-start gap-3">
+                    <span className="text-white/20 text-xs font-mono mt-0.5 shrink-0">
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">{area.title}</p>
+                      <p className="text-white/30 text-xs mt-0.5 truncate">{area.topics.slice(0, 5).join(", ")}{area.topics.length > 5 ? ` +${area.topics.length - 5}` : ""}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditDraft({ title: area.title, topics: area.topics.join(", "), isWildcard: !!area.isWildcard });
+                          setEditingIdx(idx);
+                        }}
+                        className="px-2.5 py-1.5 text-xs rounded-sm text-white/40 hover:text-white/80 transition-colors"
+                        style={{ background: "rgba(255,255,255,0.05)" }}
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => setFocusAreas(areas => areas.filter((_, i) => i !== idx))}
+                        className="px-2.5 py-1.5 text-xs rounded-sm text-white/25 hover:text-red-400 transition-colors"
+                        style={{ background: "rgba(255,255,255,0.04)" }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M1 3h10M4.5 3V2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M2.5 3l.6 7a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5l.6-7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => {
+              setFocusAreas(a => [...a, { title: "", topics: [] }]);
+              setEditDraft({ title: "", topics: "", isWildcard: false });
+              setEditingIdx(focusAreas.length);
+            }}
+            className="mt-3 w-full py-2.5 text-xs font-semibold rounded-sm transition-[border-color,color] duration-150 hover:border-white/20 hover:text-white/70"
+            style={{ border: "1px dashed rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.35)", background: "transparent" }}
+          >
+            + Bereich hinzufügen
+          </button>
+        </div>
+
+        {/* ── Chat Config Editor ── */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-white text-sm font-semibold">Chat-Konfiguration</p>
+              <p className="text-white/30 text-xs mt-0.5">System-Prompt und Fragen des Bewerbungs-Chatbots</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {chatSavedOk && <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>✓ Gespeichert</span>}
+              <button
+                onClick={saveChatConfig}
+                disabled={savingChat}
+                className="px-4 py-2 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
+                style={{ background: AUDI_RED, color: "#fff", opacity: savingChat ? 0.6 : 1 }}
+              >
+                {savingChat ? "Speichern…" : "Chat-Config speichern"}
+              </button>
+            </div>
+          </div>
+
+          {/* System prompt intro */}
+          <div className="mb-6">
+            <label className="block text-xs text-white/40 font-medium mb-2 tracking-wide uppercase">
+              System-Prompt Intro
+            </label>
+            <textarea
+              value={chatIntro}
+              onChange={e => setChatIntro(e.target.value)}
+              rows={3}
+              placeholder="You are the official AI assistant for the Audi Innovation Hub…"
+              className="w-full px-3 py-2.5 rounded-sm text-sm text-white placeholder-white/20 outline-none resize-none leading-relaxed"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+            />
+            <p className="text-white/20 text-[10px] mt-1.5">
+              Der erste Satz des System-Prompts — definiert Rolle und Kontext des Chatbots.
+            </p>
+          </div>
+
+          {/* Per-field questions */}
+          <div className="flex flex-col gap-3">
+            {Object.entries(CHAT_FIELD_LABELS).map(([field, label]) => (
+              <div key={field} className="grid grid-cols-12 gap-3 items-center">
+                <label className="col-span-3 text-xs text-white/40 font-medium tracking-wide">
+                  {label}
+                </label>
+                <input
+                  value={chatQuestions[field] ?? ""}
+                  onChange={e => setChatQuestions(q => ({ ...q, [field]: e.target.value }))}
+                  className="col-span-9 px-3 py-2 rounded-sm text-sm text-white placeholder-white/20 outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+                  placeholder={`Frage für "${label}"…`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* How to become superuser note */}
         <div className="mt-8 p-5 rounded-sm"
