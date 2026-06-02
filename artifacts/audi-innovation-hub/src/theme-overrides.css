@@ -220,17 +220,35 @@ button:not(:disabled):active,
   color: #ffffff !important;
 }
 
-/* Inline style background — all browser serialization variants */
-.light [style*="rgb(187, 10, 33)"],
-.light [style*="rgb(187,10,33)"],
-.light [style*="#BB0A21"],
-.light [style*="#bb0a21"] {
+/* Inline style background — only apply white text to elements whose BACKGROUND
+   is Audi Red. We prefix with "background" so we never accidentally match
+   section labels that use #BB0A21 as their TEXT color — those must stay red.
+   High-specificity variants (0,3,0) beat .text-white (0,2,0) so source order
+   is irrelevant — these always win. */
+.light [style*="background: rgb(187, 10, 33)"],
+.light [style*="background-color: rgb(187, 10, 33)"],
+.light [style*="background: #BB0A21"],
+.light [style*="background:#BB0A21"] {
   color: #ffffff !important;
 }
-.light [style*="rgb(187, 10, 33)"] *,
-.light [style*="rgb(187,10,33)"] *,
-.light [style*="#BB0A21"] *,
-.light [style*="#bb0a21"] * {
+.light [style*="background: rgb(187, 10, 33)"] *,
+.light [style*="background-color: rgb(187, 10, 33)"] *,
+.light [style*="background: #BB0A21"] *,
+.light [style*="background:#BB0A21"] * {
+  color: #ffffff !important;
+}
+
+/* Higher-specificity override — wins over .text-white regardless of source order */
+.light.light [style*="background: rgb(187, 10, 33)"],
+.light.light [style*="background-color: rgb(187, 10, 33)"],
+.light.light [style*="background: #BB0A21"],
+.light.light [style*="background:#BB0A21"] {
+  color: #ffffff !important;
+}
+.light.light [style*="background: rgb(187, 10, 33)"] *,
+.light.light [style*="background-color: rgb(187, 10, 33)"] *,
+.light.light [style*="background: #BB0A21"] *,
+.light.light [style*="background:#BB0A21"] * {
   color: #ffffff !important;
 }
 

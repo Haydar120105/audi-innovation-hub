@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
 import { useAuth, UserButton } from "@clerk/clerk-react";
 import { useSubmitApplication } from "@workspace/api-client-react";
 import type { Application } from "@workspace/api-client-react";
+import HackathonInvite from "../components/HackathonInvite";
+import HackathonRedirectCard from "../components/HackathonRedirectCard";
 
 const AUDI_RED = "#BB0A21";
 
@@ -15,6 +17,7 @@ interface Message {
 }
 
 interface CollectedFields {
+  applicantType?: string;
   companyName?: string;
   website?: string;
   problem?: string;
@@ -28,6 +31,7 @@ interface CollectedFields {
 }
 
 const REQUIRED_FIELDS: (keyof CollectedFields)[] = [
+  "applicantType",
   "companyName",
   "problem",
   "solution",
@@ -37,7 +41,10 @@ const REQUIRED_FIELDS: (keyof CollectedFields)[] = [
   "targetDepartments",
 ];
 
+const HACKATHON_TYPES = ["student_team", "pre_seed_idea", "solo_founder", "university_research"];
+
 const FIELD_LABELS: Record<string, string> = {
+  applicantType: "Who you are",
   companyName: "Company name",
   problem: "Problem & customers",
   solution: "Solution",
@@ -49,6 +56,13 @@ const FIELD_LABELS: Record<string, string> = {
 
 // Quick-reply chips per field (only enum-type fields)
 const FIELD_SUGGESTIONS: Partial<Record<keyof CollectedFields, { label: string; value: string }[]>> = {
+  applicantType: [
+    { label: "Startup / Company",     value: "startup" },
+    { label: "Student Team",          value: "student_team" },
+    { label: "Pre-Seed / Early Idea", value: "pre_seed_idea" },
+    { label: "Solo Founder",          value: "solo_founder" },
+    { label: "Research / University", value: "university_research" },
+  ],
   stage: [
     { label: "Pre-Seed", value: "Pre-Seed" },
     { label: "Seed", value: "Seed" },
@@ -86,7 +100,7 @@ const DEPT_LABELS: Record<string, string> = {
 const INITIAL_MESSAGE: Message = {
   role: "assistant",
   content:
-    "Welcome to the Audi Innovation Hub — I'll guide you through the application step by step. It takes about 5 minutes.\n\nYou can also upload a pitch deck (PDF) and I'll extract the information automatically.\n\nLet's start: **what's the name of your startup?**",
+    "Welcome to the Audi Innovation Hub — I'll find the best path for you in about 2 minutes.\n\nYou can also upload a pitch deck (PDF) and I'll extract the information automatically.\n\nFirst: **who are you?**",
 };
 
 const NEXT_STEPS = [
@@ -186,7 +200,7 @@ function FieldProgress({
   );
 }
 
-function SuccessScreen({ result }: { result: Application }) {
+function SuccessScreen({ result, preselectedSlot }: { result: Application; preselectedSlot: string | null }) {
   const [, navigate] = useLocation();
   const [copied, setCopied] = useState(false);
   const scores = (result.departmentScores ?? []) as Array<{
@@ -196,6 +210,13 @@ function SuccessScreen({ result }: { result: Application }) {
     justification: string;
   }>;
   const topDepts = [...scores].sort((a, b) => b.score - a.score).slice(0, 3);
+
+  const maxScore = scores.length > 0 ? Math.max(...scores.map((s) => s.score)) : 100;
+  const applicantType = (result.structuredData as Record<string, unknown> | null)?.["applicantType"] as string | undefined;
+  const showHackathon =
+    !!preselectedSlot ||
+    maxScore < 60 ||
+    (applicantType !== undefined && HACKATHON_TYPES.includes(applicantType));
 
   const base =
     typeof window !== "undefined"
@@ -346,6 +367,14 @@ function SuccessScreen({ result }: { result: Application }) {
           </div>
         )}
 
+        {/* Hackathon invitation for low-fit / student applicants / pre-selected slot */}
+        {showHackathon && result.trackingToken && (
+          <HackathonInvite
+            trackingToken={result.trackingToken}
+            currentSlot={result.hackathonSlot ?? preselectedSlot ?? null}
+          />
+        )}
+
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link href="/dashboard">
@@ -377,9 +406,12 @@ export default function Apply() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<Application | null>(null);
   const [deptSelection, setDeptSelection] = useState<string[]>([]);
+  const [showHackathonRedirect, setShowHackathonRedirect] = useState(false);
+  const [hackathonRedirectDismissed, setHackathonRedirectDismissed] = useState(false);
+  const [preselectedSlot, setPreselectedSlot] = useState<string | null>(null);
   // Which field the bot is currently asking about — drives quick-reply chip selection.
-  // Starts as "companyName" (first question) which has no chips → no chips shown initially.
-  const [currentField, setCurrentField] = useState<string>("companyName");
+  // Starts as "applicantType" (first question) which shows type chips immediately.
+  const [currentField, setCurrentField] = useState<string>("applicantType");
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -464,6 +496,11 @@ export default function Apply() {
         setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
         if (data.extractedFields && Object.keys(data.extractedFields).length > 0) {
           mergeFields(data.extractedFields);
+          // Show hackathon redirect card when applicant type is a hackathon-suitable type
+          const extractedType = data.extractedFields["applicantType"] as string | undefined;
+          if (extractedType && HACKATHON_TYPES.includes(extractedType)) {
+            setShowHackathonRedirect(true);
+          }
         }
         // Update which field the bot is now asking about so chips match
         setCurrentField(data.currentField ?? "");
@@ -609,6 +646,20 @@ export default function Apply() {
           transcript,
         },
       });
+
+      // If the user pre-selected a hackathon slot, save it immediately
+      if (preselectedSlot && result.trackingToken) {
+        try {
+          await fetch(`/api/applications/track/${result.trackingToken}/hackathon-slot`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slot: preselectedSlot }),
+          });
+        } catch {
+          // Non-critical — slot can be selected again on SuccessScreen
+        }
+      }
+
       setSubmitted(result);
     } catch {
       setMessages((prev) => [
@@ -623,7 +674,7 @@ export default function Apply() {
     }
   }, [allRequiredFilled, isSubmitting, messages, collectedFields, submitApp]);
 
-  if (submitted) return <SuccessScreen result={submitted} />;
+  if (submitted) return <SuccessScreen result={submitted} preselectedSlot={preselectedSlot} />;
 
   return (
     <div
@@ -683,7 +734,7 @@ export default function Apply() {
                 className={`max-w-[80%] px-5 py-3.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                   msg.role === "assistant"
                     ? "rounded-tl-sm text-white/85"
-                    : "rounded-tr-sm text-white"
+                    : "rounded-tr-sm"
                 }`}
                 style={
                   msg.role === "assistant"
@@ -696,13 +747,22 @@ export default function Apply() {
                           background: "rgba(255,255,255,0.08)",
                           border: "1px solid rgba(255,255,255,0.15)",
                         }
-                      : { background: AUDI_RED }
+                      : { background: AUDI_RED, color: "#fff" }
                 }
               >
                 {msg.content}
               </div>
             </div>
           ))}
+
+          {/* Hackathon redirect card — shown after bot recommends hackathon pathway */}
+          {showHackathonRedirect && !hackathonRedirectDismissed && !isLoading && (
+            <HackathonRedirectCard
+              onContinueApplication={() => setHackathonRedirectDismissed(true)}
+              onSlotSelect={(slot) => setPreselectedSlot(slot)}
+              preselectedSlot={preselectedSlot}
+            />
+          )}
 
           {(isLoading || isPdfLoading) && (
             <div className="msg-in flex justify-start">

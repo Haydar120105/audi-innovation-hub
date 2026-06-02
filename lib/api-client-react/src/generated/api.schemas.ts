@@ -124,6 +124,7 @@ export interface Application {
   kpis?: KpiItem[] | null;
   assignedEmployee?: AssignedEmployee | null;
   ndaStatus?: string | null;
+  hackathonSlot?: string | null;
 }
 
 export interface ApplicationTracking {
@@ -131,6 +132,8 @@ export interface ApplicationTracking {
   status: string;
   createdAt: string;
   departmentScores?: DepartmentScore[];
+  hackathonSlot?: string | null;
+  applicantType?: string | null;
 }
 
 export interface ApiError {

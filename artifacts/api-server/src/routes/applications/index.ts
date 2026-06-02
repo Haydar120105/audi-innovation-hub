@@ -136,7 +136,39 @@ router.get("/applications/track/:token", async (req, res): Promise<void> => {
     status: app.status,
     createdAt: app.createdAt,
     departmentScores: app.departmentScores,
+    hackathonSlot: app.hackathonSlot ?? null,
+    applicantType: (app.structuredData as Record<string, unknown> | null)?.["applicantType"] ?? null,
   });
+});
+
+const VALID_HACKATHON_SLOTS = ["jul-2026", "aug-2026", "sep-2026", "oct-2026"];
+
+// POST /applications/track/:token/hackathon-slot — public (token as identity)
+router.post("/applications/track/:token/hackathon-slot", async (req, res): Promise<void> => {
+  const params = TrackApplicationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const { slot } = req.body as { slot?: string };
+  if (!slot || !VALID_HACKATHON_SLOTS.includes(slot)) {
+    res.status(400).json({ error: "Invalid slot. Must be one of: " + VALID_HACKATHON_SLOTS.join(", ") });
+    return;
+  }
+
+  const [updated] = await db
+    .update(applicationsTable)
+    .set({ hackathonSlot: slot })
+    .where(eq(applicationsTable.trackingToken, params.data.token))
+    .returning({ hackathonSlot: applicationsTable.hackathonSlot });
+
+  if (!updated) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
+
+  res.json({ ok: true, slot: updated.hackathonSlot });
 });
 
 // GET /applications/:id — audi_staff or owner

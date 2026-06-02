@@ -54,6 +54,7 @@ export const DEFAULT_FOCUS_AREAS = [
 ];
 
 export const DEFAULT_FIELD_QUESTIONS: Record<string, string> = {
+  applicantType: "Before we dive in — who are you? Are you building a company, part of a student team, an early-stage idea, or a solo founder?",
   companyName: "What's the name of your startup?",
   problem: "What problem are you solving, and who are your target customers?",
   solution: "How does your solution work — what do you actually build or offer?",
@@ -87,7 +88,8 @@ Your task is to analyze this startup and return a JSON response with exactly thi
     "traction": "...",
     "targetCollaboration": "...",
     "pitchDeckUrl": "...",
-    "website": "..."
+    "website": "...",
+    "applicantType": "<startup | student_team | university_research | solo_inventor>"
   },
   "departmentScores": [
     {{departmentsList}}
@@ -105,5 +107,11 @@ Scoring guidelines:
 - Score 0-100 on how relevant this startup is for each department
 - Consider technology fit, use cases, and potential for pilot projects
 - Only include business cases for the top 2 scoring departments
+
+applicantType classification:
+- "startup": A company with a product/service, aiming for commercial collaboration or pilot projects
+- "student_team": University students or recent graduates working on a project, thesis, or early idea
+- "university_research": Academic research group or lab seeking industry partnerships
+- "solo_inventor": Individual inventor or freelancer without a team structure
 
 Return ONLY the JSON object, no markdown, no explanation.`;

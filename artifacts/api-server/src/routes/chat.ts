@@ -20,6 +20,7 @@ const DEPARTMENTS = [
 ];
 
 const REQUIRED_FIELDS = [
+  "applicantType",
   "companyName",
   "problem",
   "solution",
@@ -28,6 +29,8 @@ const REQUIRED_FIELDS = [
   "teamSize",
   "targetDepartments",
 ];
+
+const HACKATHON_TYPES = ["student_team", "pre_seed_idea", "solo_founder", "university_research"];
 
 // ── In-memory config cache (60 s TTL) ────────────────────────────────────────
 interface ChatConfig {
@@ -115,7 +118,20 @@ ${
 ## What you can discuss if directly asked
 - What the Audi Innovation Hub offers startups (mentoring, pilot projects, access to Audi)
 - The 6 departments: ${DEPARTMENTS.map((d) => d.name).join(", ")}
-- What happens after submission (2-week review → pitch invitation if shortlisted)`;
+- What happens after submission (2-week review → pitch invitation if shortlisted)${
+  HACKATHON_TYPES.includes(collectedFields["applicantType"] as string)
+    ? `
+
+## Important: Hackathon Pathway
+This person identified as "${collectedFields["applicantType"]}". In your VERY NEXT response, warmly recommend the IPAI Innovation Hackathon in Heilbronn as a much better fit for them before proceeding. Key points to mention:
+- It's a hands-on full day at the IPAI Innovation Park in Heilbronn
+- They solve real, concrete challenges from Audi departments — in teams, on-site
+- Great for students, solo founders, and early-stage ideas
+- They can pick a date slot right here in the chat
+- They can still continue with a full Innovation Hub application if they prefer
+Be warm, enthusiastic, and make it sound like a genuine opportunity — not a consolation prize.`
+    : ""
+}`;
 }
 
 // ── Tool definition ───────────────────────────────────────────────────────────
@@ -126,6 +142,11 @@ const SAVE_TOOL = {
   input_schema: {
     type: "object" as const,
     properties: {
+      applicantType: {
+        type: "string",
+        enum: ["startup", "student_team", "pre_seed_idea", "solo_founder", "university_research"],
+        description: "Type of applicant: startup = company/established, student_team = students/university project, pre_seed_idea = early idea without a company yet, solo_founder = individual building alone, university_research = academic research group",
+      },
       companyName: { type: "string", description: "The startup company name" },
       website: { type: "string", description: "Company website or LinkedIn URL" },
       problem: { type: "string", description: "What problem they solve and who their target customers are" },

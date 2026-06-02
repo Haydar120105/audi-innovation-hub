@@ -203,7 +203,7 @@ function OnboardingSection({ app }: { app: ApplicationSummary }) {
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold leading-tight mb-1"
-                  style={{ color: step.done ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.88)" }}>
+                  style={{ color: step.done ? "rgba(255,255,255,0.45)" : AUDI_RED }}>
                   {step.title}
                 </p>
                 <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>{step.description}</p>

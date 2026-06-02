@@ -184,7 +184,9 @@ export const TrackApplicationResponse = zod.object({
   "departmentName": zod.string(),
   "score": zod.number(),
   "justification": zod.string()
-})).optional()
+})).optional(),
+  "hackathonSlot": zod.string().nullable().optional(),
+  "applicantType": zod.string().nullable().optional(),
 })
 
 

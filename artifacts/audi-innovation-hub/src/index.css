@@ -397,4 +397,33 @@
   .light img[src*="audi-logo"] {
     filter: none !important;
   }
+
+  /* ── Missing dark backgrounds not covered above ──────────────────
+     Testimonials partners section (#080810), MoreOpportunities section
+     (#080812), and Benefits CTA gradient (#131124 / #0E0C1B) stay dark
+     in light mode without these overrides — causing white-class text to
+     become dark text on a dark background (invisible). ─────────────── */
+  .light [style*="#080810"],
+  .light [style*="#080812"] {
+    background: var(--app-page) !important;
+  }
+
+  .light [style*="#131124"],
+  .light [style*="#0E0C1B"] {
+    background: var(--app-page-soft) !important;
+    border-color: var(--app-border) !important;
+  }
+
+  /* ── Homepage section headings: Audi-Rot in light mode ──────────
+     All large section headings use font-light text-white. In light mode
+     they must be colored #BB0A21 so they match the red section labels
+     and remain clearly visible against the light background.
+     font-light scopes this to section headings — card/page h2s use
+     font-semibold or font-medium and are not affected. ──────────── */
+  .light h2.font-light.text-white,
+  .light h2.font-light.text-white span,
+  .light h3.text-xl.font-semibold.text-white,
+  .light h3.text-xl.font-semibold.text-white span {
+    color: #BB0A21 !important;
+  }
 }
