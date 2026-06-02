@@ -8,7 +8,7 @@
 ## Starten
 
 ```bash
-pnpm --filter @workspace/audi-innovation-hub run dev
+PORT=5173 BASE_PATH=/ pnpm --filter @workspace/audi-innovation-hub run dev
 ```
 
 ---

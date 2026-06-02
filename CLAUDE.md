@@ -38,7 +38,7 @@ pnpm --filter @workspace/db run push          # Schema → Neon-Postgres pushen
 pnpm --filter @workspace/api-server run dev
 
 # Terminal 2 — Frontend
-pnpm --filter @workspace/audi-innovation-hub run dev
+PORT=5173 BASE_PATH=/ pnpm --filter @workspace/audi-innovation-hub run dev
 ```
 
 URLs: Frontend → **http://localhost:5173** | Backend → **http://localhost:8000**

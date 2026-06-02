@@ -148,7 +148,7 @@ docker compose --env-file .env.production up -d api
 pnpm --filter @workspace/api-server run dev
 
 # Terminal 2 — Frontend
-pnpm --filter @workspace/audi-innovation-hub run dev
+PORT=5173 BASE_PATH=/ pnpm --filter @workspace/audi-innovation-hub run dev
 ```
 
 Änderungen lokal testen → `git push` → auf Server deployen.

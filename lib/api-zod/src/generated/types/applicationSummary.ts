@@ -12,6 +12,7 @@ export interface AssignedEmployee {
   role: string;
   email: string;
   department: string;
+  clerkId?: string;
 }
 
 export interface ApplicationSummary {

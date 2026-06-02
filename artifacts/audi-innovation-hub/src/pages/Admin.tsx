@@ -19,7 +19,17 @@ interface ClerkUser {
   createdAt: number;
   lastSignInAt: number | null;
   role: string | null;
+  departmentId: string | null;
 }
+
+const DEPARTMENTS = [
+  { id: "production", name: "Production & Manufacturing" },
+  { id: "rd",         name: "Research & Development" },
+  { id: "design",     name: "Design Studio" },
+  { id: "logistics",  name: "Logistics & Supply Chain" },
+  { id: "sales",      name: "Sales & Customer Experience" },
+  { id: "digital",    name: "Digital & IT" },
+] as const;
 
 // ─── Role config ──────────────────────────────────────────────────────────────
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; description: string }> = {
@@ -87,12 +97,71 @@ async function patchUserRole(
   if (!res.ok) throw new Error(await res.text());
 }
 
+async function patchUserDept(
+  userId: string,
+  departmentId: string | null,
+  token: string | null,
+): Promise<void> {
+  const res = await fetch(`/api/admin/users/${userId}/department`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ departmentId: departmentId ?? null }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ─── Analysis prompt default (mirrors backend hub-config-defaults.ts) ────────
+const DEFAULT_ANALYSIS_PROMPT = `You are an expert innovation analyst at Audi AG. You have just reviewed a startup application interview transcript for the Audi Innovation Hub program.
+
+Company: {{companyName}}
+
+Interview Transcript:
+{{transcriptText}}
+
+Your task is to analyze this startup and return a JSON response with exactly this structure:
+
+{
+  "structuredData": {
+    "companyName": "...",
+    "problemStatement": "...",
+    "solution": "...",
+    "technology": "...",
+    "stage": "...",
+    "teamSize": "...",
+    "traction": "...",
+    "targetCollaboration": "...",
+    "pitchDeckUrl": "...",
+    "website": "..."
+  },
+  "departmentScores": [
+    {{departmentsList}}
+  ],
+  "businessCases": [
+    {
+      "departmentId": "<id of top 2 departments by score>",
+      "departmentName": "<name>",
+      "brief": "<200-word business case brief explaining why this startup would be valuable for this Audi department, what the collaboration could look like, and what business outcomes are possible>"
+    }
+  ]
+}
+
+Scoring guidelines:
+- Score 0-100 on how relevant this startup is for each department
+- Consider technology fit, use cases, and potential for pilot projects
+- Only include business cases for the top 2 scoring departments
+
+Return ONLY the JSON object, no markdown, no explanation.`;
+
 // ─── Config types + helpers ───────────────────────────────────────────────────
 interface FocusArea { title: string; topics: string[]; isWildcard?: boolean }
 interface HubConfig {
   focus_areas: FocusArea[];
   chat_questions: Record<string, string>;
   chat_system_prompt: { intro: string };
+  analysis_prompt: string;
 }
 
 const CHAT_FIELD_LABELS: Record<string, string> = {
@@ -133,6 +202,8 @@ export default function AdminDashboard() {
   const [filterRole, setFilterRole] = useState<string>("all");
   const [pendingRole, setPendingRole] = useState<Record<string, string | null>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [pendingDept, setPendingDept] = useState<Record<string, string | null>>({});
+  const [savedDept, setSavedDept] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // ── Content management state ──────────────────────────────────────────────
@@ -147,13 +218,18 @@ export default function AdminDashboard() {
   const [savingChat, setSavingChat] = useState(false);
   const [chatSavedOk, setChatSavedOk] = useState(false);
 
+  const [analysisPrompt, setAnalysisPrompt] = useState(DEFAULT_ANALYSIS_PROMPT);
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [promptSavedOk, setPromptSavedOk] = useState(false);
+  const [resettingPrompt, setResettingPrompt] = useState(false);
+
   // ── Applications overview (superuser can see all) ──────────────────────────
   const { data: apps = [] } = useListApplications();
   const appStats = {
     total:       apps.length,
-    pending:     apps.filter(a => a.status === "pending" || a.status === "routed").length,
-    shortlisted: apps.filter(a => a.status === "shortlisted").length,
-    accepted:    apps.filter(a => a.status === "accepted").length,
+    pending:     apps.filter(a => a.status === "pending" || a.status === "analyzed").length,
+    shortlisted: apps.filter(a => a.status === "assigned").length,
+    accepted:    apps.filter(a => a.status === "approved").length,
     declined:    apps.filter(a => a.status === "declined" || a.status === "archived").length,
   };
 
@@ -179,6 +255,7 @@ export default function AdminDashboard() {
     setFocusAreas(configData.focus_areas ?? []);
     setChatQuestions(configData.chat_questions ?? {});
     setChatIntro(configData.chat_system_prompt?.intro ?? "");
+    setAnalysisPrompt(configData.analysis_prompt ?? "");
   }, [configData]);
 
   const roleMutation = useMutation({
@@ -194,6 +271,21 @@ export default function AdminDashboard() {
       setSaved((s) => ({ ...s, [userId]: true }));
       setTimeout(() => setSaved((s) => ({ ...s, [userId]: false })), 2000);
       setPendingRole((p) => { const next = { ...p }; delete next[userId]; return next; });
+    },
+  });
+
+  const deptMutation = useMutation({
+    mutationFn: async ({ userId, departmentId }: { userId: string; departmentId: string | null }) => {
+      const token = await getToken();
+      await patchUserDept(userId, departmentId, token);
+    },
+    onSuccess: (_data, { userId, departmentId }) => {
+      qc.setQueryData<ClerkUser[]>(["admin-users"], (prev) =>
+        prev?.map((u) => (u.id === userId ? { ...u, departmentId } : u)) ?? [],
+      );
+      setSavedDept((s) => ({ ...s, [userId]: true }));
+      setTimeout(() => setSavedDept((s) => ({ ...s, [userId]: false })), 2000);
+      setPendingDept((p) => { const next = { ...p }; delete next[userId]; return next; });
     },
   });
 
@@ -242,6 +334,36 @@ export default function AdminDashboard() {
     }
   }
 
+  async function saveAnalysisPrompt() {
+    setSavingPrompt(true);
+    try {
+      const token = await getToken();
+      await putConfig("analysis_prompt", analysisPrompt, token);
+      setPromptSavedOk(true);
+      setTimeout(() => setPromptSavedOk(false), 2500);
+      qc.invalidateQueries({ queryKey: ["admin-config"] });
+    } finally {
+      setSavingPrompt(false);
+    }
+  }
+
+  async function resetAnalysisPrompt() {
+    setResettingPrompt(true);
+    try {
+      const token = await getToken();
+      // Delete the custom DB row so the server falls back to its built-in default
+      await fetch("/api/admin/config/analysis_prompt", {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      // Immediately restore the default in the textarea (no need to refetch)
+      setAnalysisPrompt(DEFAULT_ANALYSIS_PROMPT);
+      qc.invalidateQueries({ queryKey: ["admin-config"] });
+    } finally {
+      setResettingPrompt(false);
+    }
+  }
+
   const filtered = users.filter((u) => {
     const matchSearch = !search ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -287,6 +409,18 @@ export default function AdminDashboard() {
                 <path d="M6 1L10.5 3.5v5L6 11 1.5 8.5v-5L6 1z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               Departments
+            </button>
+          </Link>
+          <Link href="/org">
+            <button className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97] hidden sm:inline-flex items-center gap-1.5"
+              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: "1px solid rgba(255,255,255,0.09)" }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <circle cx="6" cy="3" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                <circle cx="2.5" cy="9" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                <circle cx="9.5" cy="9" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M6 4.5v2M6 6.5l-3 1M6 6.5l3 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Org Chart
             </button>
           </Link>
           <span className="px-2.5 py-1 text-[10px] font-semibold rounded-sm hidden sm:inline"
@@ -346,7 +480,7 @@ export default function AdminDashboard() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18, duration: 0.5 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-10"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-10"
         >
           {/* Applications */}
           <Link href="/applications">
@@ -445,6 +579,32 @@ export default function AdminDashboard() {
               <div className="mt-3 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(139,92,246,0.4), transparent)" }} />
             </div>
           </a>
+
+          {/* Org Chart */}
+          <Link href="/org">
+            <div className="group p-5 rounded-sm cursor-pointer transition-[border-color,background-color] duration-200 hover:border-white/15"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-9 h-9 rounded-sm flex items-center justify-center"
+                  style={{ background: "rgba(20,184,166,0.1)", border: "1px solid rgba(20,184,166,0.22)" }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="3.5" r="2" stroke="#14b8a6" strokeWidth="1.4"/>
+                    <circle cx="3" cy="12" r="2" stroke="#14b8a6" strokeWidth="1.4"/>
+                    <circle cx="13" cy="12" r="2" stroke="#14b8a6" strokeWidth="1.4"/>
+                    <path d="M8 5.5v3M8 8.5L3 10.5M8 8.5l5 2" stroke="#14b8a6" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mt-1 opacity-30 group-hover:opacity-60 transition-opacity">
+                  <path d="M3 7h8M8 4l3 3-3 3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p className="text-white font-semibold text-sm mb-1">Org Chart</p>
+              <p className="text-white/35 text-xs leading-relaxed">
+                {stats.staff} Mitarbeiter · Bewerbungen zuweisen
+              </p>
+              <div className="mt-3 h-px w-full" style={{ background: "linear-gradient(90deg, rgba(20,184,166,0.4), transparent)" }} />
+            </div>
+          </Link>
         </motion.div>
 
         {/* User Management section anchor */}
@@ -552,6 +712,10 @@ export default function AdminDashboard() {
               const isDirty = pendingRole[user.id] !== undefined && pendingRole[user.id] !== user.role;
               const isSaving = roleMutation.isPending && roleMutation.variables?.userId === user.id;
 
+              const currentDept = pendingDept[user.id] !== undefined ? pendingDept[user.id] : user.departmentId;
+              const isDeptDirty = pendingDept[user.id] !== undefined && pendingDept[user.id] !== user.departmentId;
+              const isDeptSaving = deptMutation.isPending && deptMutation.variables?.userId === user.id;
+
               return (
                 <motion.div
                   key={user.id}
@@ -591,37 +755,75 @@ export default function AdminDashboard() {
                     <RoleBadge role={user.role} />
                   </div>
 
-                  {/* Role selector */}
-                  <div className="col-span-3 flex items-center gap-2">
-                    <select
-                      value={currentRole ?? ""}
-                      onChange={e => setPendingRole(p => ({ ...p, [user.id]: e.target.value || null }))}
-                      disabled={isSaving}
-                      className="flex-1 px-3 py-1.5 rounded-sm text-xs text-white outline-none transition-[border-color] duration-200"
-                      style={{
-                        background: "rgba(255,255,255,0.06)",
-                        border: `1px solid ${isDirty ? "#f59e0b66" : "rgba(255,255,255,0.1)"}`,
-                      }}
-                    >
-                      <option value="">No role</option>
-                      <option value="applicant">Applicant</option>
-                      <option value="audi_staff">Audi Staff</option>
-                      <option value="superuser">Superuser</option>
-                    </select>
-
-                    {isDirty && (
-                      <button
-                        onClick={() => roleMutation.mutate({ userId: user.id, role: currentRole ?? null })}
+                  {/* Role + dept selectors */}
+                  <div className="col-span-3 flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={currentRole ?? ""}
+                        onChange={e => setPendingRole(p => ({ ...p, [user.id]: e.target.value || null }))}
                         disabled={isSaving}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] whitespace-nowrap"
-                        style={{ background: AUDI_RED, color: "#fff" }}
+                        className="flex-1 px-3 py-1.5 rounded-sm text-xs text-white outline-none transition-[border-color] duration-200"
+                        style={{
+                          background: "rgba(255,255,255,0.06)",
+                          border: `1px solid ${isDirty ? "#f59e0b66" : "rgba(255,255,255,0.1)"}`,
+                        }}
                       >
-                        {isSaving ? "…" : "Save"}
-                      </button>
-                    )}
+                        <option value="">No role</option>
+                        <option value="applicant">Applicant</option>
+                        <option value="audi_staff">Audi Staff</option>
+                        <option value="superuser">Superuser</option>
+                      </select>
 
-                    {saved[user.id] && !isDirty && (
-                      <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>✓ Saved</span>
+                      {isDirty && (
+                        <button
+                          onClick={() => roleMutation.mutate({ userId: user.id, role: currentRole ?? null })}
+                          disabled={isSaving}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] whitespace-nowrap"
+                          style={{ background: AUDI_RED, color: "#fff" }}
+                        >
+                          {isSaving ? "…" : "Save"}
+                        </button>
+                      )}
+
+                      {saved[user.id] && !isDirty && (
+                        <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>✓ Saved</span>
+                      )}
+                    </div>
+
+                    {/* Department selector — only for audi_staff */}
+                    {currentRole === "audi_staff" && (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={currentDept ?? ""}
+                          onChange={e => setPendingDept(p => ({ ...p, [user.id]: e.target.value || null }))}
+                          disabled={isDeptSaving}
+                          className="flex-1 px-3 py-1.5 rounded-sm text-xs text-white outline-none transition-[border-color] duration-200"
+                          style={{
+                            background: "rgba(59,130,246,0.06)",
+                            border: `1px solid ${isDeptDirty ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.2)"}`,
+                          }}
+                        >
+                          <option value="">— Abteilung —</option>
+                          {DEPARTMENTS.map(d => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+
+                        {isDeptDirty && (
+                          <button
+                            onClick={() => deptMutation.mutate({ userId: user.id, departmentId: currentDept ?? null })}
+                            disabled={isDeptSaving}
+                            className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] whitespace-nowrap"
+                            style={{ background: "#3b82f6", color: "#fff" }}
+                          >
+                            {isDeptSaving ? "…" : "Save"}
+                          </button>
+                        )}
+
+                        {savedDept[user.id] && !isDeptDirty && (
+                          <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>✓</span>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -856,6 +1058,70 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* ── Analyse-Prompt Editor ── */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-white text-sm font-semibold">Analyse-Prompt (KI-Bewertung)</p>
+              <p className="text-white/30 text-xs mt-0.5">Der Prompt den die KI erhält, um Bewerbungen zu bewerten und Business Cases zu generieren</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {promptSavedOk && <span className="text-xs font-semibold" style={{ color: "#16a34a" }}>✓ Gespeichert</span>}
+              <button
+                onClick={resetAnalysisPrompt}
+                disabled={resettingPrompt}
+                className="px-3 py-2 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
+                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)", opacity: resettingPrompt ? 0.6 : 1 }}
+              >
+                {resettingPrompt ? "Zurücksetzen…" : "Auf Standard zurücksetzen"}
+              </button>
+              <button
+                onClick={saveAnalysisPrompt}
+                disabled={savingPrompt}
+                className="px-4 py-2 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
+                style={{ background: AUDI_RED, color: "#fff", opacity: savingPrompt ? 0.6 : 1 }}
+              >
+                {savingPrompt ? "Speichern…" : "Prompt speichern"}
+              </button>
+            </div>
+          </div>
+
+          {/* Placeholder hint */}
+          <div className="mb-4 px-4 py-3 rounded-sm flex flex-wrap gap-x-5 gap-y-2"
+            style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)" }}>
+            <p className="text-xs w-full font-semibold" style={{ color: "#60a5fa" }}>Verfügbare Platzhalter — werden zur Laufzeit ersetzt:</p>
+            {[
+              { ph: "{{companyName}}", desc: "Name des Startups" },
+              { ph: "{{transcriptText}}", desc: "Vollständiges Interview-Transkript" },
+              { ph: "{{departmentsList}}", desc: "JSON-Array aller 6 Audi-Abteilungen" },
+            ].map(({ ph, desc }) => (
+              <span key={ph} className="flex items-center gap-1.5 text-xs">
+                <code className="px-1.5 py-0.5 rounded font-mono text-[11px]"
+                  style={{ background: "rgba(59,130,246,0.15)", color: "#93c5fd" }}>{ph}</code>
+                <span style={{ color: "rgba(255,255,255,0.35)" }}>{desc}</span>
+              </span>
+            ))}
+          </div>
+
+          <textarea
+            value={analysisPrompt}
+            onChange={e => setAnalysisPrompt(e.target.value)}
+            rows={18}
+            spellCheck={false}
+            className="w-full px-4 py-3 rounded-sm text-sm text-white placeholder-white/20 outline-none resize-y leading-relaxed"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.09)",
+              fontFamily: "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace",
+              fontSize: "12px",
+              lineHeight: "1.7",
+            }}
+          />
+          <p className="text-white/20 text-[10px] mt-1.5">
+            Änderungen sind innerhalb von 60 Sekunden aktiv (Cache-TTL). Nächste Analyse nach dem Speichern nutzt den neuen Prompt.
+          </p>
         </div>
 
         {/* How to become superuser note */}

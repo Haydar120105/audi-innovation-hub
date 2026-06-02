@@ -185,7 +185,7 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
       system:
         "You are a data extractor. Look at the full conversation and call save_startup_info with any startup information you can identify. If nothing relevant was mentioned, still call the tool — just omit those fields.",
       tools: [SAVE_TOOL],
-      tool_choice: { type: "required" },
+      tool_choice: { type: "any" },
       messages: formattedMessages,
     });
 

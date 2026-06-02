@@ -116,7 +116,7 @@ Body: { messages: [{role,content}][], collectedFields: {} }
 
 ── CALL 1: Extraktion ──────────────────────────────────────────────
 system: "Du bist ein Daten-Extraktor. Rufe save_startup_info auf..."
-tool_choice: { type: "required" }   ← zwingt Claude zum Tool-Call
+tool_choice: { type: "any" }        ← zwingt Claude zum Tool-Call
 → extractedFields: nur neu extrahierte Felder aus diesem Turn
 
 ── CALL 2: Konversations-Antwort ───────────────────────────────────

@@ -124,10 +124,11 @@ const AssignedEmployeeSchema = zod.object({
   role: zod.string(),
   email: zod.string().email(),
   department: zod.string(),
+  clerkId: zod.string().optional(),
 });
 
 export const UpdateApplicationBody = zod.object({
-  "status": zod.enum(['pending', 'routed', 'shortlisted', 'accepted', 'declined', 'archived']).optional(),
+  "status": zod.enum(['pending', 'analyzed', 'assigned', 'approved', 'declined', 'archived']).optional(),
   "notes": zod.string().optional(),
   "rating": zod.number().int().min(1).max(5).nullable().optional(),
   "nextStep": zod.string().optional(),

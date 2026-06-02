@@ -14,48 +14,48 @@ const STATUS_CONFIG: Record<string, {
   icon: string; nextStep: string; nextStepDetail: string;
 }> = {
   pending: {
-    label: "Under Review", color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)",
+    label: "In Bearbeitung", color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)",
     icon: "⏳",
-    nextStep: "Your application is being reviewed",
-    nextStepDetail: "Our team carefully reviews every submission. You'll hear from us within 2 weeks.",
+    nextStep: "Deine Bewerbung wird analysiert",
+    nextStepDetail: "Unsere KI extrahiert die wichtigsten Daten und erstellt einen Businesscase. Das dauert nur wenige Minuten.",
   },
-  routed: {
-    label: "In Analysis", color: "#60a5fa", bg: "rgba(96,165,250,0.08)", border: "rgba(96,165,250,0.2)",
+  analyzed: {
+    label: "Analysiert", color: "#60a5fa", bg: "rgba(96,165,250,0.08)", border: "rgba(96,165,250,0.2)",
     icon: "🔍",
-    nextStep: "Matching you with the right team",
-    nextStepDetail: "We're identifying which Audi department is the best fit for your solution.",
+    nextStep: "Analyse abgeschlossen — passende Abteilungen werden benachrichtigt",
+    nextStepDetail: "Deine Bewerbung wurde ausgewertet und an die Audi-Abteilungen mit der höchsten Übereinstimmung weitergeleitet.",
   },
-  shortlisted: {
-    label: "Shortlisted", color: "#a78bfa", bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.2)",
-    icon: "⭐",
-    nextStep: "Prepare a short presentation",
-    nextStepDetail: "You've made the shortlist. Prepare a 5-minute overview of your solution for the next stage.",
+  assigned: {
+    label: "Ambassador zugewiesen", color: "#a78bfa", bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.2)",
+    icon: "👤",
+    nextStep: "Dein Startup Ambassador nimmt bald Kontakt auf",
+    nextStepDetail: "Ein persönlicher Ansprechpartner bei Audi wurde dir zugewiesen. Er wird sich in Kürze bei dir melden.",
   },
-  accepted: {
-    label: "Accepted", color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)",
+  approved: {
+    label: "Erstkontakt hergestellt", color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)",
     icon: "✅",
-    nextStep: "Complete your onboarding",
-    nextStepDetail: "Congratulations! Sign the NDA and connect with your Audi contact to get started.",
+    nextStep: "Dein Ambassador hat sich gemeldet — nächste Schritte folgen",
+    nextStepDetail: "Herzlichen Glückwunsch! Dein Startup Ambassador hat Erstkontakt hergestellt. Schau dir die Onboarding-Schritte unten an.",
   },
   declined: {
-    label: "Not Progressed", color: "#9ca3af", bg: "rgba(156,163,175,0.06)", border: "rgba(156,163,175,0.12)",
+    label: "Nicht weitergeleitet", color: "#9ca3af", bg: "rgba(156,163,175,0.06)", border: "rgba(156,163,175,0.12)",
     icon: "○",
-    nextStep: "Thank you for applying",
-    nextStepDetail: "This application didn't progress further. You're welcome to apply again in our next cohort.",
+    nextStep: "Danke für deine Bewerbung",
+    nextStepDetail: "Diese Bewerbung wurde leider nicht weitergeleitet. Du kannst dich gerne in unserer nächsten Runde erneut bewerben.",
   },
   archived: {
-    label: "Archived", color: "#6b7280", bg: "rgba(107,114,128,0.05)", border: "rgba(107,114,128,0.1)",
+    label: "Archiviert", color: "#6b7280", bg: "rgba(107,114,128,0.05)", border: "rgba(107,114,128,0.1)",
     icon: "○",
-    nextStep: "Application archived",
-    nextStepDetail: "This application has been archived.",
+    nextStep: "Bewerbung archiviert",
+    nextStepDetail: "Diese Bewerbung wurde archiviert.",
   },
 };
 
 const PIPELINE = [
-  { key: "pending",     label: "Submitted"   },
-  { key: "routed",      label: "Analysis"    },
-  { key: "shortlisted", label: "Shortlisted" },
-  { key: "accepted",    label: "Accepted"    },
+  { key: "pending",  label: "Eingereicht" },
+  { key: "analyzed", label: "Analysiert"  },
+  { key: "assigned", label: "Zugewiesen"  },
+  { key: "approved", label: "Erstkontakt" },
 ];
 
 // ── Pipeline bar ──────────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ function OnboardingSection({ app }: { app: ApplicationSummary }) {
 
 function AppCard({ app, idx }: { app: ApplicationSummary; idx: number }) {
   const cfg = STATUS_CONFIG[app.status] ?? STATUS_CONFIG.pending;
-  const isAccepted = app.status === "accepted";
+  const isOnboarding = app.status === "assigned" || app.status === "approved";
   const date = new Date(app.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   return (
@@ -232,13 +232,13 @@ function AppCard({ app, idx }: { app: ApplicationSummary; idx: number }) {
       className="rounded-xl overflow-hidden"
       style={{
         background: "rgba(255,255,255,0.03)",
-        border: `1px solid ${isAccepted ? "rgba(52,211,153,0.2)" : "rgba(255,255,255,0.08)"}`,
+        border: `1px solid ${isOnboarding ? "rgba(52,211,153,0.2)" : "rgba(255,255,255,0.08)"}`,
         boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
       }}
     >
       {/* Top accent line */}
       <div className="h-[2px] w-full" style={{
-        background: isAccepted
+        background: isOnboarding
           ? "linear-gradient(90deg, #34d399, transparent)"
           : `linear-gradient(90deg, ${AUDI_RED}, transparent)`
       }} />
@@ -277,7 +277,7 @@ function AppCard({ app, idx }: { app: ApplicationSummary; idx: number }) {
         <PipelineBar status={app.status} />
 
         {/* Next step / onboarding */}
-        {isAccepted ? <OnboardingSection app={app} /> : <NextStepHint status={app.status} />}
+        {isOnboarding ? <OnboardingSection app={app} /> : <NextStepHint status={app.status} />}
 
         {/* Footer */}
         <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
@@ -346,8 +346,8 @@ export default function ApplicantDashboard() {
   const { user } = useUser();
   const role = user?.publicMetadata?.["role"] as string | undefined;
   const hasApps = (apps?.length ?? 0) > 0;
-  const acceptedCount = apps?.filter(a => a.status === "accepted").length ?? 0;
-  const activeCount   = apps?.filter(a => ["pending","routed","shortlisted"].includes(a.status)).length ?? 0;
+  const approvedCount = apps?.filter(a => a.status === "approved").length ?? 0;
+  const activeCount   = apps?.filter(a => ["pending","analyzed","assigned"].includes(a.status)).length ?? 0;
 
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #0d0d1f 0%, #080812 60%)" }}>
@@ -408,7 +408,7 @@ export default function ApplicantDashboard() {
               className="grid grid-cols-3 gap-3 mb-10">
               <StatCard label="Total submitted" value={apps!.length} />
               <StatCard label="In progress"     value={activeCount} />
-              <StatCard label="Accepted"         value={acceptedCount} accent={acceptedCount > 0} />
+              <StatCard label="Erstkontakt"      value={approvedCount} accent={approvedCount > 0} />
             </motion.div>
           )}
         </AnimatePresence>

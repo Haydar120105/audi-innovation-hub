@@ -66,3 +66,44 @@ export const DEFAULT_FIELD_QUESTIONS: Record<string, string> = {
 
 export const DEFAULT_SYSTEM_PROMPT_INTRO =
   "You are the official AI assistant for the Audi Innovation Hub — Audi AG's startup collaboration program.";
+
+export const DEFAULT_ANALYSIS_PROMPT = `You are an expert innovation analyst at Audi AG. You have just reviewed a startup application interview transcript for the Audi Innovation Hub program.
+
+Company: {{companyName}}
+
+Interview Transcript:
+{{transcriptText}}
+
+Your task is to analyze this startup and return a JSON response with exactly this structure:
+
+{
+  "structuredData": {
+    "companyName": "...",
+    "problemStatement": "...",
+    "solution": "...",
+    "technology": "...",
+    "stage": "...",
+    "teamSize": "...",
+    "traction": "...",
+    "targetCollaboration": "...",
+    "pitchDeckUrl": "...",
+    "website": "..."
+  },
+  "departmentScores": [
+    {{departmentsList}}
+  ],
+  "businessCases": [
+    {
+      "departmentId": "<id of top 2 departments by score>",
+      "departmentName": "<name>",
+      "brief": "<200-word business case brief explaining why this startup would be valuable for this Audi department, what the collaboration could look like, and what business outcomes are possible>"
+    }
+  ]
+}
+
+Scoring guidelines:
+- Score 0-100 on how relevant this startup is for each department
+- Consider technology fit, use cases, and potential for pilot projects
+- Only include business cases for the top 2 scoring departments
+
+Return ONLY the JSON object, no markdown, no explanation.`;
