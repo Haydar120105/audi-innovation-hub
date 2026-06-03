@@ -45,9 +45,6 @@ services:
     # Domain dem nginx-Service (Port 80) in der Coolify-UI zuweisen.
     expose:
       - "80"
-    volumes:
-      # nginx-Config gemountet (nicht gebacken) — erlaubt Hot-Swap ohne Rebuild
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       api:
         condition: service_healthy

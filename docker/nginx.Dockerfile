@@ -38,8 +38,9 @@ FROM nginx:alpine AS runner
 # Copy built React app
 COPY --from=builder /app/artifacts/audi-innovation-hub/dist/public /usr/share/nginx/html
 
-# nginx.conf is mounted as a volume at runtime (allows hot-swap without rebuild)
-# Remove default config to avoid conflicts
+# Bake the Coolify HTTP-only nginx config into the image. Runtime bind mounts can
+# turn missing source files into directories, which makes nginx fail at startup.
 RUN rm /etc/nginx/conf.d/default.conf
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80 443
+EXPOSE 80
