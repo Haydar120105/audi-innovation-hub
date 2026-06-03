@@ -131,22 +131,22 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...   # Nur Publishable Key
 
 ---
 
-## Produktion (Docker auf Strato VPS)
+## Produktion (Coolify / Docker Compose)
 
-Server läuft unter **http://85.215.132.195** (HTTP-only, noch keine Domain/SSL).
+Deployment über **Coolify** (selbst-gehostete PaaS). Coolify baut das `docker-compose.yml`
+aus dem Git-Repo und betreibt zwei Services (`api` + `nginx`). Coolifys Traefik-Proxy
+übernimmt Domain-Routing + automatisches Let's-Encrypt-SSL — keine Certbot-Logik im Repo.
 
 ```bash
-# Lokale Entwicklung → committen → pushen
-git push origin main
+# Lokaler Build-Test vor dem Push
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_... docker compose build
 
-# Auf Server deployen (SSH: root@85.215.132.195)
-cd ~/audi-innovation-hub
-git pull
-docker compose --env-file .env.production build
-docker compose --env-file .env.production up -d
+# Deploy: git push → Coolify deployed automatisch (oder per Klick in der UI)
+git push origin main
 ```
 
-Vollständige Doku: siehe **DEPLOYMENT.md**
+Env-Vars werden in der **Coolify-UI** gesetzt (`VITE_CLERK_PUBLISHABLE_KEY` als
+Build-Variable!). Vollständige Doku: siehe **DEPLOYMENT.md**
 
 ---
 

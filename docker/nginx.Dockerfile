@@ -1,8 +1,10 @@
 # ── Stage 1: Build React app ─────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+# node:20-slim (Debian/glibc), NICHT alpine/musl: das Lockfile behält gezielt
+# nur die glibc-x64-Binary @rollup/rollup-linux-x64-gnu für den Vite-Build.
+FROM node:20-slim AS builder
 WORKDIR /app
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@10.14.0
 
 # Copy workspace manifests first for better layer caching
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -19,6 +21,8 @@ RUN pnpm install --frozen-lockfile
 
 COPY artifacts/audi-innovation-hub/  ./artifacts/audi-innovation-hub/
 COPY lib/                            ./lib/
+# tsconfig.json des Frontends macht `extends: "../../tsconfig.base.json"`
+COPY tsconfig.base.json tsconfig.json ./
 
 # VITE_CLERK_PUBLISHABLE_KEY is baked into the JS bundle at build time
 ARG VITE_CLERK_PUBLISHABLE_KEY
