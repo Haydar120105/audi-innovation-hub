@@ -123,10 +123,13 @@ export default function Track() {
       )}
 
       {data && (() => {
+        const HACKATHON_TYPES = ["student_team", "pre_seed_idea", "solo_founder", "university_research"];
         const scores = data.departmentScores ?? [];
         const maxScore = scores.length > 0 ? Math.max(...scores.map((s) => s.score)) : 100;
         const showHackathon =
-          maxScore < 60 || data.applicantType === "student_team" || data.applicantType === "university_research";
+          maxScore < 60 ||
+          data.hackathonSlot != null ||
+          (data.applicantType != null && HACKATHON_TYPES.includes(data.applicantType));
         return (
         <div className="max-w-2xl w-full" style={{ animation: "fadeUp 0.6s ease forwards" }}>
           <div className="text-center mb-10">
@@ -169,7 +172,7 @@ export default function Track() {
             </div>
           )}
 
-          {/* Hackathon invitation for low-fit / student applicants */}
+          {/* Hackathon invitation for low-fit / hackathon-type applicants */}
           {showHackathon && (
             <div className="mb-8">
               <HackathonInvite

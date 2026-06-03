@@ -112,6 +112,6 @@ applicantType classification:
 - "startup": A company with a product/service, aiming for commercial collaboration or pilot projects
 - "student_team": University students or recent graduates working on a project, thesis, or early idea
 - "university_research": Academic research group or lab seeking industry partnerships
-- "solo_inventor": Individual inventor or freelancer without a team structure
+- "solo_founder": Individual inventor or freelancer without a team structure
 
 Return ONLY the JSON object, no markdown, no explanation.`;

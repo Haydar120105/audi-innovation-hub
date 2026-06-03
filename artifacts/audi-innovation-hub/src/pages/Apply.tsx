@@ -584,6 +584,7 @@ export default function Apply() {
           botReply += `\n\nI still need a few more details: ${missingLabels}. Let's go through them — `;
           const firstMissing = data.missing[0];
           const prompts: Record<string, string> = {
+            applicantType: "are you a startup, student team, solo founder, or early-stage idea?",
             companyName: "what's the name of your company?",
             problem: "what problem are you solving, and who are your target customers?",
             solution: "can you describe your solution or product?",
@@ -672,7 +673,7 @@ export default function Apply() {
       ]);
       setIsSubmitting(false);
     }
-  }, [allRequiredFilled, isSubmitting, messages, collectedFields, submitApp]);
+  }, [allRequiredFilled, isSubmitting, messages, collectedFields, submitApp, preselectedSlot]);
 
   if (submitted) return <SuccessScreen result={submitted} preselectedSlot={preselectedSlot} />;
 
@@ -758,7 +759,11 @@ export default function Apply() {
           {/* Hackathon redirect card — shown after bot recommends hackathon pathway */}
           {showHackathonRedirect && !hackathonRedirectDismissed && !isLoading && (
             <HackathonRedirectCard
-              onContinueApplication={() => setHackathonRedirectDismissed(true)}
+              onContinueApplication={() => {
+                setHackathonRedirectDismissed(true);
+                // Signal backend to stop repeating the hackathon recommendation
+                setCollectedFields((prev) => ({ ...prev, hackathonDismissed: true } as CollectedFields));
+              }}
               onSlotSelect={(slot) => setPreselectedSlot(slot)}
               preselectedSlot={preselectedSlot}
             />

@@ -119,7 +119,8 @@ ${
 - What the Audi Innovation Hub offers startups (mentoring, pilot projects, access to Audi)
 - The 6 departments: ${DEPARTMENTS.map((d) => d.name).join(", ")}
 - What happens after submission (2-week review → pitch invitation if shortlisted)${
-  HACKATHON_TYPES.includes(collectedFields["applicantType"] as string)
+  HACKATHON_TYPES.includes(collectedFields["applicantType"] as string) &&
+  !collectedFields["hackathonDismissed"]
     ? `
 
 ## Important: Hackathon Pathway
