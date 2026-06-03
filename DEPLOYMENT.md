@@ -1,227 +1,157 @@
-# Deployment — Strato VPS (VC2-4, 4 GB RAM)
+# Deployment — Coolify (Docker Compose)
 
-## Aktueller Stand
-
-| Was | Wo |
-|-----|----|
-| Server | Strato VPS Linux VC2-4, 4 GB RAM |
-| IP | `85.215.132.195` |
-| Domain | noch keine — läuft über IP (HTTP) |
-| Betriebssystem | Ubuntu 22.04 LTS |
-| Repo auf Server | `/root/audi-innovation-hub` |
-| Clerk-Keys | Test-Keys (`pk_test_...`) — für Produktion später auf Live-Keys umstellen |
-
-Aufruf im Browser: **http://85.215.132.195**
+Die Plattform wird über **Coolify** deployed — eine selbst-gehostete PaaS, die das
+`docker-compose.yml` direkt aus dem Git-Repo baut und betreibt. Coolify bringt einen
+eigenen Reverse-Proxy (**Traefik**) inkl. automatischem **Let's-Encrypt-SSL** mit —
+deshalb gibt es im Repo keine Certbot-/manuelle-SSL-Logik mehr.
 
 ## Architektur
 
 ```
-Internet
-    │ :80 + :443
+Domain (DNS A-Record)
+    │ :443 (HTTPS)
     ▼
-┌─────────────────────────────────────────┐
-│  nginx (Docker)                         │
-│  ├── / → static React build (HTML/CSS/JS│
-│  └── /api/ → proxy → api:8000           │
-└────────────────────┬────────────────────┘
-                     │ internal Docker network
-                     ▼
-              ┌─────────────┐
-              │  api (Docker│
-              │  Express    │
-              │  port 8000  │
-              └──────┬──────┘
-                     │
-            ┌────────┴────────┐
-            │  Neon PostgreSQL │  ← extern
-            │  Clerk Auth      │  ← extern
-            └──────────────────┘
+┌──────────────────────────────────┐
+│  Coolify Traefik-Proxy           │  ← SSL-Terminierung (Let's Encrypt, automatisch)
+└────────────────┬─────────────────┘
+                 │ :80 (HTTP, intern)
+                 ▼
+┌──────────────────────────────────┐
+│  nginx (Docker)                  │
+│  ├── /     → static React build  │
+│  └── /api/ → proxy → api:8000     │
+└────────────────┬─────────────────┘
+                 │ internes Docker-Netzwerk
+                 ▼
+          ┌─────────────┐
+          │  api (Docker)│  Express, Port 8000
+          └──────┬───────┘
+                 │
+        ┌────────┴─────────┐
+        │  Neon PostgreSQL  │  ← extern
+        │  Clerk Auth       │  ← extern
+        │  Anthropic API    │  ← extern
+        └───────────────────┘
 ```
+
+Services (siehe `docker-compose.yml`):
+- **api** — Express-Server, exposed intern Port 8000, Healthcheck auf `/api/healthz`.
+- **nginx** — serviert das statische React-Build und proxyt `/api/` → `api:8000`,
+  exposed intern Port 80. Coolify routet die Domain hierher.
 
 ---
 
-## Einmaliges VPS-Setup
+## Einmaliges Setup in Coolify
 
-### 1. Docker installieren
-
-```bash
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-### 2. Repo klonen
+### 1. Coolify auf dem Server installieren (falls noch nicht vorhanden)
 
 ```bash
-git clone https://github.com/Haydar120105/audi-innovation-hub.git
-cd audi-innovation-hub
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
 
-### 3. Env-Datei anlegen
+Coolify-UI öffnen (`http://SERVER-IP:8000`) und Admin-Account anlegen.
+
+### 2. Ressource anlegen
+
+1. **Project → New Resource → Docker Compose** (Git-basiert).
+2. Git-Repo verbinden (`https://github.com/Haydar120105/audi-innovation-hub.git`),
+   Branch wählen. Coolify erkennt das `docker-compose.yml` automatisch.
+
+### 3. Environment-Variablen setzen
+
+In der Coolify-UI unter **Environment Variables** eintragen (NICHT ins Repo committen):
+
+| Variable | Wert | Hinweis |
+|----------|------|---------|
+| `DATABASE_URL` | `postgresql://...` | Neon-Connection-String |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Claude API |
+| `CLERK_PUBLISHABLE_KEY` | `pk_live_...` | Clerk Publishable (Live) |
+| `CLERK_SECRET_KEY` | `sk_live_...` | Clerk Secret (Live) — nur Backend |
+| `DEPARTMENT_WRITE_SECRET` | beliebiger starker String | Legacy Department-Endpoints |
+| `VITE_CLERK_PUBLISHABLE_KEY` | `pk_live_...` (= `CLERK_PUBLISHABLE_KEY`) | **als Build-Variable markieren** |
+
+> **Wichtig:** `VITE_CLERK_PUBLISHABLE_KEY` wird zur **Build-Zeit** ins JS-Bundle
+> gebacken. In Coolify muss die Variable als **Build Variable / Build-Time** markiert
+> sein, sonst landet sie nicht im Frontend.
+
+### 4. Domain + SSL
+
+1. DNS **A-Record** auf die Coolify-Server-IP setzen (`hub.deinedomain.de → SERVER-IP`).
+2. In Coolify die Domain dem **`nginx`-Service (Port 80)** zuweisen.
+3. Coolify holt automatisch ein Let's-Encrypt-Zertifikat und terminiert HTTPS via Traefik —
+   keine manuelle Certbot-Konfiguration nötig.
+
+### 5. Clerk Production-Instanz
+
+Live-Keys (`pk_live_...`) erfordern eine in Clerk hinterlegte, verifizierte Domain.
+Im [Clerk-Dashboard](https://dashboard.clerk.com) die Produktions-Domain eintragen.
+
+### 6. Datenbank-Schema anwenden (einmalig)
+
+Das Drizzle-Schema muss einmalig gegen die Neon-Datenbank gepusht werden — am
+einfachsten **lokal** (nicht auf dem Server):
 
 ```bash
-cp .env.production.example .env.production
-nano .env.production   # echte Keys eintragen
-```
-
-> **Wichtig:** Verwende in Produktion die Live-Keys von Clerk (`pk_live_...`, `sk_live_...`).  
-> Den Test-Key (`pk_test_...`) nur für lokale Entwicklung.
-
-### 4. DNS setzen
-
-Gehe zu deinem DNS-Provider und setze einen **A-Record**:
-
-```
-hub.deinedomain.de   →   VPS-IP
-```
-
-Warte bis der Record propagiert ist (`ping hub.deinedomain.de` sollte die VPS-IP zurückgeben).
-
-### 5. nginx.conf: Domain eintragen
-
-```bash
-sed -i 's/YOUR_DOMAIN/hub.deinedomain.de/g' docker/nginx.conf
-```
-
-### 6. Erstmalig: SSL-Zertifikat holen
-
-Da das Zertifikat noch nicht existiert, kann nginx nicht mit HTTPS starten.  
-Wir starten zuerst mit der HTTP-only Config, holen das Zertifikat, dann schalten wir auf HTTPS um:
-
-```bash
-# Schritt A: Mit HTTP-only Config starten
-docker compose build
-docker compose run -d --name nginx-init \
-  -p 80:80 \
-  -v $(pwd)/docker/nginx-init.conf:/etc/nginx/conf.d/default.conf:ro \
-  -v $(pwd)/certbot/www:/var/www/certbot:ro \
-  $(docker compose config --images nginx 2>/dev/null || echo "audi-innovation-hub-nginx")
-
-# Schritt B: Zertifikat holen
-docker compose run --rm --profile certbot certbot certonly \
-  --webroot -w /var/www/certbot \
-  -d hub.deinedomain.de \
-  --email deine@email.de \
-  --agree-tos --no-eff-email
-
-# Schritt C: Temporären nginx stoppen, echte Compose-Umgebung starten
-docker stop nginx-init && docker rm nginx-init
-docker compose up -d
-```
-
-### 7. Datenbank-Schema anwenden
-
-Das Drizzle-Schema muss einmalig gegen die Neon-Datenbank gepusht werden.  
-Das passiert am einfachsten **lokal** (nicht auf dem VPS):
-
-```bash
-# Lokal ausführen (DATABASE_URL aus .env.production oder artifacts/api-server/.env):
+# DATABASE_URL der Produktions-DB exportieren oder in artifacts/api-server/.env setzen
 pnpm --filter @workspace/db run push
 ```
 
+### 7. Deploy auslösen
+
+In Coolify auf **Deploy** klicken. Coolify baut beide Images (`api` + `nginx`) und
+startet die Services. Folge-Deploys laufen automatisch bei `git push` (wenn Auto-Deploy
+aktiviert ist) oder per Klick.
+
 ---
 
-## Updates einspielen (Deploy-Workflow)
+## Lokaler Build-Test (vor dem Push empfohlen)
 
-Lokal entwickeln, committen, pushen — dann auf dem Server:
+Prüfen, dass beide Images sauber bauen:
 
 ```bash
-cd ~/audi-innovation-hub
-git pull
-docker compose --env-file .env.production build
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_... docker compose build
+```
+
+Komplett lokal hochfahren (mit einer `.env.production`-Datei für die Runtime-Vars):
+
+```bash
 docker compose --env-file .env.production up -d
+docker compose ps
+curl http://localhost:8000/api/healthz   # → 200
 ```
 
-> **Wichtig:** `--env-file .env.production` immer angeben, damit `VITE_CLERK_PUBLISHABLE_KEY`
-> beim Build korrekt übergeben wird (wird in den JS-Bundle eingebettet).
+> Hinweis: Lokal mappt Compose keine Host-Ports (nur `expose`). Für einen lokalen
+> Browser-Test ggf. temporär ein `ports: ["8080:80"]` zum `nginx`-Service ergänzen.
 
-Für reine API-Updates (kein Frontend rebuild):
-```bash
-docker compose --env-file .env.production build api
-docker compose --env-file .env.production up -d api
-```
+---
 
-### Lokale Entwicklung
+## Lokale Entwicklung (ohne Docker)
 
 ```bash
 # Terminal 1 — Backend
 pnpm --filter @workspace/api-server run dev
 
 # Terminal 2 — Frontend
-pnpm --filter @workspace/audi-innovation-hub run dev
+PORT=5173 BASE_PATH=/ pnpm --filter @workspace/audi-innovation-hub run dev
 ```
 
-Änderungen lokal testen → `git push` → auf Server deployen.
+Frontend → http://localhost:5173 | Backend → http://localhost:8000
+Vite proxyt `/api/*` → `localhost:8000`.
 
 ---
 
-## SSL auto-renew (Crontab)
+## Nützliche Befehle (Server / lokal)
 
 ```bash
-crontab -e
+docker compose ps                  # Status aller Container
+docker compose logs -f api         # API-Logs
+docker compose logs -f nginx       # nginx-Logs
+curl http://localhost:8000/api/healthz   # Health-Check
+docker compose restart api         # Container neustarten
+docker compose down                # Alles stoppen
 ```
 
-Folgende Zeile eintragen:
-
-```cron
-0 3 * * * cd /root/audi-innovation-hub && docker compose run --rm --profile certbot certbot renew --quiet && docker compose exec nginx nginx -s reload
-```
-
-Zertifikate laufen 90 Tage — Certbot erneuert sie automatisch wenn sie <30 Tage Restlaufzeit haben.
-
----
-
-## Nützliche Befehle
-
-```bash
-# Status aller Container
-docker compose ps
-
-# Logs anzeigen
-docker compose logs -f api
-docker compose logs -f nginx
-
-# API Health-Check
-curl http://localhost:8000/api/healthz
-
-# Container neustarten
-docker compose restart api
-
-# Alles stoppen
-docker compose down
-
-# Alles stoppen + Images löschen
-docker compose down --rmi all
-```
-
----
-
-## Domain + HTTPS nachrüsten (wenn Domain vorhanden)
-
-```bash
-# 1. Domain in nginx.conf eintragen
-sed -i 's/YOUR_DOMAIN/hub.deinedomain.de/g' docker/nginx.conf
-
-# 2. Sicherstellen dass nginx-init.conf aktiv ist (HTTP-only für Certbot)
-sed -i 's|docker/nginx.conf|docker/nginx-init.conf|' docker-compose.yml
-docker compose --env-file .env.production up -d nginx
-
-# 3. Zertifikat holen
-docker compose run --rm --profile certbot certbot certonly \
-  --webroot -w /var/www/certbot \
-  -d hub.deinedomain.de \
-  --email deine@email.de \
-  --agree-tos --no-eff-email
-
-# 4. Auf HTTPS-Config umschalten
-sed -i 's|docker/nginx-init.conf|docker/nginx.conf|' docker-compose.yml
-docker compose --env-file .env.production up -d nginx
-
-# 5. Clerk Production-Keys eintragen
-nano .env.production   # pk_live_... und sk_live_... eintragen
-docker compose --env-file .env.production build nginx
-docker compose --env-file .env.production up -d
-```
+In Coolify selbst gibt es Logs, Deploy-History, Rollback und Env-Management direkt in der UI.
 
 ---
 
@@ -229,11 +159,10 @@ docker compose --env-file .env.production up -d
 
 | Problem | Lösung |
 |---------|--------|
-| `api` startet nicht | `docker compose logs api` — wahrscheinlich fehlende Env-Var |
-| nginx gibt 502 | API noch nicht `healthy` — kurz warten oder `docker compose logs api` |
-| Clerk-Login schlägt fehl | `VITE_CLERK_PUBLISHABLE_KEY` stimmt nicht — Image mit `--env-file .env.production` neu bauen |
-| Zertifikat-Fehler | DNS noch nicht propagiert — warten und erneut versuchen |
-| Port 80/443 belegt | `ss -tlnp \| grep -E '80\|443'` — anderer Prozess blockiert |
-| `pnpm frozen-lockfile` Fehler | `sed -i 's/--frozen-lockfile/--no-frozen-lockfile/g' docker/api.Dockerfile docker/nginx.Dockerfile` |
-| `tsconfig.base.json` nicht gefunden | In `docker/nginx.Dockerfile` nach `COPY lib/ ./lib/` folgendes ergänzen: `COPY tsconfig.base.json ./` und `COPY tsconfig.json ./` |
-| `VITE_CLERK_PUBLISHABLE_KEY not set` Warning | Harmlos — Key wurde bereits beim Build eingebettet. Beim `up` wird er nicht mehr benötigt. |
+| `api` startet nicht | Logs prüfen — meist fehlende Env-Var in Coolify |
+| nginx gibt 502 | API noch nicht `healthy` — kurz warten oder API-Logs prüfen |
+| Clerk-Login schlägt fehl | `VITE_CLERK_PUBLISHABLE_KEY` fehlt/falsch — als **Build-Variable** setzen und neu deployen |
+| SSL-Zertifikat kommt nicht | DNS A-Record noch nicht propagiert — warten, dann in Coolify neu auslösen |
+| `pnpm frozen-lockfile` Fehler | `pnpm-lock.yaml` ist veraltet — lokal `pnpm install` ausführen und committen |
+| `tsconfig.base.json` nicht gefunden | In `docker/*.Dockerfile` sicherstellen, dass `tsconfig.base.json`/`tsconfig.json` mitkopiert werden |
+| `VITE_CLERK_PUBLISHABLE_KEY not set` Warning beim Runtime-Start | Harmlos — der Key wurde bereits beim Build eingebettet |

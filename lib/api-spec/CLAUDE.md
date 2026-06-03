@@ -56,10 +56,10 @@ pnpm --filter @workspace/api-spec run codegen
 Folgende Felder sind manuell in `api-zod` und `api-client-react` ergänzt, aber NICHT in `openapi.yaml`:
 
 ```
-ApplicationUpdateInput:  rating, nextStep, requirements, milestones, kpis
-Application:             rating, nextStep, requirements, milestones, kpis
+ApplicationUpdateInput:  rating, nextStep, requirements, milestones, kpis, assignedEmployee, ndaStatus
+Application:             rating, nextStep, requirements, milestones, kpis, assignedEmployee, ndaStatus
 ApplicationSummary:      rating (für Staff-Rating in der Liste)
-Interfaces:              RequirementItem, MilestoneItem, KpiItem
+Interfaces:              RequirementItem, MilestoneItem, KpiItem, AssignedEmployee
 ```
 
 **Nach jedem Codegen:** Manuelle Ergänzungen erneut in `api-zod` und `api-client-react` eintragen.

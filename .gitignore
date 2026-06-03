@@ -57,3 +57,6 @@ certbot/www/
 # Replit
 .cache/
 .local/
+
+# Claude Code harness artifacts
+.claude/scheduled_tasks.lock

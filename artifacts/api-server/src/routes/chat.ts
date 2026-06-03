@@ -1,6 +1,12 @@
 import { Router } from "express";
+import { inArray } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { db, hubConfigTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import {
+  DEFAULT_FIELD_QUESTIONS,
+  DEFAULT_SYSTEM_PROMPT_INTRO,
+} from "./hub-config-defaults";
 
 const router = Router();
 
@@ -13,20 +19,71 @@ const DEPARTMENTS = [
   { id: "digital", name: "Digital & IT" },
 ];
 
-const REQUIRED_FIELDS = ["companyName", "problem", "solution", "technology", "stage", "teamSize", "targetDepartments"];
+const REQUIRED_FIELDS = [
+  "applicantType",
+  "companyName",
+  "problem",
+  "solution",
+  "technology",
+  "stage",
+  "teamSize",
+  "targetDepartments",
+];
 
-const FIELD_QUESTIONS: Record<string, string> = {
-  companyName: "What's the name of your startup?",
-  problem: "What problem are you solving, and who are your target customers?",
-  solution: "How does your solution work — what do you actually build or offer?",
-  technology: "What's the core technology behind it, and what makes it defensible or unique?",
-  stage: "What stage is your company at right now — pre-seed, seed, Series A, or further along?",
-  teamSize: "How many people are on your team, and what are the key areas of expertise?",
-  targetDepartments:
-    "Which Audi departments do you think you could collaborate with most effectively? We have: Production & Manufacturing, R&D, Design Studio, Logistics & Supply Chain, Sales & Customer Experience, and Digital & IT.",
-};
+const HACKATHON_TYPES = ["student_team", "pre_seed_idea", "solo_founder", "university_research"];
 
-function buildSystemPrompt(collectedFields: Record<string, unknown>): string {
+// ── In-memory config cache (60 s TTL) ────────────────────────────────────────
+interface ChatConfig {
+  questions: Record<string, string>;
+  systemPromptIntro: string;
+  cachedAt: number;
+}
+
+let chatConfigCache: ChatConfig | null = null;
+const CACHE_TTL = 60_000;
+
+async function loadChatConfig(): Promise<Omit<ChatConfig, "cachedAt">> {
+  if (chatConfigCache && Date.now() - chatConfigCache.cachedAt < CACHE_TTL) {
+    return chatConfigCache;
+  }
+
+  try {
+    const rows = await db
+      .select()
+      .from(hubConfigTable)
+      .where(inArray(hubConfigTable.key, ["chat_questions", "chat_system_prompt"]));
+
+    let questions: Record<string, string> = { ...DEFAULT_FIELD_QUESTIONS };
+    let systemPromptIntro = DEFAULT_SYSTEM_PROMPT_INTRO;
+
+    for (const row of rows) {
+      if (row.key === "chat_questions") {
+        // Merge: DB values override defaults, allowing partial overrides
+        questions = { ...questions, ...(row.value as Record<string, string>) };
+      } else if (row.key === "chat_system_prompt") {
+        const val = row.value as { intro?: string };
+        if (val?.intro) systemPromptIntro = val.intro;
+      }
+    }
+
+    chatConfigCache = { questions, systemPromptIntro, cachedAt: Date.now() };
+    return chatConfigCache;
+  } catch {
+    // DB unavailable → return hardcoded defaults silently
+    return { questions: DEFAULT_FIELD_QUESTIONS, systemPromptIntro: DEFAULT_SYSTEM_PROMPT_INTRO };
+  }
+}
+
+// ── Reply prompt builder ──────────────────────────────────────────────────────
+/**
+ * Builds the system prompt for the REPLY step.
+ * collectedFields must already include anything just extracted in the extraction step.
+ */
+function buildReplyPrompt(
+  collectedFields: Record<string, unknown>,
+  questions: Record<string, string>,
+  systemPromptIntro: string,
+): string {
   const missing = REQUIRED_FIELDS.filter((f) => !collectedFields[f]);
   const collected = REQUIRED_FIELDS.filter((f) => collectedFields[f]);
 
@@ -35,70 +92,67 @@ function buildSystemPrompt(collectedFields: Record<string, unknown>): string {
       ? collected.map((f) => `${f}: ${JSON.stringify(collectedFields[f])}`).join(", ")
       : "none yet";
 
-  const missingSummary = missing.length > 0 ? missing.join(", ") : "all collected";
-  const nextQuestion = missing.length > 0 ? FIELD_QUESTIONS[missing[0]] : null;
+  const nextField = missing[0] ?? null;
+  const nextQuestion = nextField ? (questions[nextField] ?? DEFAULT_FIELD_QUESTIONS[nextField]) : null;
 
-  return `You are the official AI assistant for the Audi Innovation Hub — Audi AG's startup collaboration program. Your role is to guide startup founders through the application by collecting key information in a natural, friendly conversation.
+  return `${systemPromptIntro}
 
-## What you can discuss
-- What the Audi Innovation Hub is and what it offers startups (mentoring, pilot projects, resources, access to Audi infrastructure)
-- The 6 departments and what they are looking for:
-${DEPARTMENTS.map((d) => `  - ${d.name}`).join("\n")}
-- The application and evaluation process (AI scoring, department routing, 2-week review cycle)
-- What happens after submission (review → potential pitch invitation)
-- General questions about Audi's innovation strategy
+## Information already collected
+${collectedSummary}
 
-## What you must NOT do
-- Discuss topics unrelated to Audi, automotive innovation, or this application
-- Make promises about acceptance or outcomes
-- Provide general business consulting outside the Audi context
-
-## Your primary mission
-Collect the following startup information through natural conversation. One question at a time — never ask multiple questions in one reply. If the user volunteers information, extract it immediately via the tool, then ask the next missing field.
-
-**Already collected:** ${collectedSummary}
-**Still needed:** ${missingSummary}
-
+## What you must ask next
 ${
   missing.length === 0
-    ? "All required fields are collected. Congratulate the user briefly and let them know they can now submit their application using the button that appeared."
-    : `The NEXT field to collect is: **${missing[0]}**. After acknowledging the user's last message, ask exactly this: "${nextQuestion}"`
+    ? "All required fields have been collected. Congratulate the user and tell them the 'Submit Application' button is now visible."
+    : `The next missing field is **${nextField}**. Ask: "${nextQuestion}"`
 }
 
-## CRITICAL — Conversation rhythm
-Every single response MUST follow this structure:
-1. One short sentence acknowledging what the user just said (if they said something).
-2. Immediately ask the next missing field using the question above — word for word or a natural paraphrase.
+## Rules — follow these exactly
+1. Write ONE short sentence acknowledging what the user just said (if they said something useful).
+2. Immediately ask the next question above — no detours.
+3. Maximum 2–3 sentences total. No lists, no summaries, no filler.
+4. NEVER ask about a field that is already in "Information already collected".
+5. Respond in the same language the user is writing in.
+6. Sound like a sharp, friendly colleague — not a form.
 
-NEVER end a response without a clear, specific question. The user must always know exactly what to provide next. Do not add filler, do not summarise what you've collected so far, do not explain the process unless asked.
+## What you can discuss if directly asked
+- What the Audi Innovation Hub offers startups (mentoring, pilot projects, access to Audi)
+- The 6 departments: ${DEPARTMENTS.map((d) => d.name).join(", ")}
+- What happens after submission (2-week review → pitch invitation if shortlisted)${
+  HACKATHON_TYPES.includes(collectedFields["applicantType"] as string) &&
+  !collectedFields["hackathonDismissed"]
+    ? `
 
-When you identify ANY startup information in the conversation, immediately call the save_startup_info tool — even for partial info. Extract as you go, do not wait.
-
-## Tone & style
-- Professional, warm, and concise — matching Audi's premium brand
-- Respond in the same language the user writes in (auto-detect German/English)
-- Keep responses to 2–3 sentences maximum
-- Never sound like a form — sound like a sharp, friendly colleague`;
+## Important: Hackathon Pathway
+This person identified as "${collectedFields["applicantType"]}". In your VERY NEXT response, warmly recommend the IPAI Innovation Hackathon in Heilbronn as a much better fit for them before proceeding. Key points to mention:
+- It's a hands-on full day at the IPAI Innovation Park in Heilbronn
+- They solve real, concrete challenges from Audi departments — in teams, on-site
+- Great for students, solo founders, and early-stage ideas
+- They can pick a date slot right here in the chat
+- They can still continue with a full Innovation Hub application if they prefer
+Be warm, enthusiastic, and make it sound like a genuine opportunity — not a consolation prize.`
+    : ""
+}`;
 }
 
+// ── Tool definition ───────────────────────────────────────────────────────────
 const SAVE_TOOL = {
   name: "save_startup_info",
   description:
-    "Save startup information as you extract it from the conversation. Call this immediately when you identify any relevant field — even partial information. Do not wait until you have everything.",
+    "Extract and save any startup information mentioned in the conversation. Call this even if only partial info is available. If nothing new was mentioned, call it with no fields.",
   input_schema: {
     type: "object" as const,
     properties: {
+      applicantType: {
+        type: "string",
+        enum: ["startup", "student_team", "pre_seed_idea", "solo_founder", "university_research"],
+        description: "Type of applicant: startup = company/established, student_team = students/university project, pre_seed_idea = early idea without a company yet, solo_founder = individual building alone, university_research = academic research group",
+      },
       companyName: { type: "string", description: "The startup company name" },
       website: { type: "string", description: "Company website or LinkedIn URL" },
-      problem: {
-        type: "string",
-        description: "What problem they solve and who their target customers are",
-      },
+      problem: { type: "string", description: "What problem they solve and who their target customers are" },
       solution: { type: "string", description: "Their solution or product" },
-      technology: {
-        type: "string",
-        description: "Core technology and what makes it unique",
-      },
+      technology: { type: "string", description: "Core technology and what makes it unique" },
       stage: {
         type: "string",
         enum: ["pre-seed", "seed", "series-a", "series-b-plus", "mvp-beta", "revenue-generating"],
@@ -123,6 +177,7 @@ const SAVE_TOOL = {
   },
 };
 
+// ── Route ─────────────────────────────────────────────────────────────────────
 router.post("/chat", requireAuth, async (req, res): Promise<void> => {
   const { messages, collectedFields = {} } = req.body as {
     messages: Array<{ role: string; content: string }>;
@@ -135,32 +190,31 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
   }
 
   try {
-    const systemPrompt = buildSystemPrompt(collectedFields);
     const formattedMessages = messages.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
 
-    const firstResponse = await anthropic.messages.create({
+    // Load config (DB with 60 s cache, falls back to hardcoded defaults)
+    const { questions, systemPromptIntro } = await loadChatConfig();
+
+    // ── STEP 1: Extraction ────────────────────────────────────────────────────
+    // Force a tool call so we always know what was just mentioned.
+    // This runs BEFORE the reply, ensuring the reply prompt has up-to-date fields.
+    const extractionRes = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      system: systemPrompt,
+      max_tokens: 300,
+      system:
+        "You are a data extractor. Look at the full conversation and call save_startup_info with any startup information you can identify. If nothing relevant was mentioned, still call the tool — just omit those fields.",
       tools: [SAVE_TOOL],
-      tool_choice: { type: "auto" },
+      tool_choice: { type: "any" },
       messages: formattedMessages,
     });
 
     const extractedFields: Record<string, unknown> = {};
-    let replyText = "";
-
-    const textBlocks = firstResponse.content.filter((b) => b.type === "text");
-    const toolBlocks = firstResponse.content.filter((b) => b.type === "tool_use");
-
-    // Extract fields from any tool calls
-    for (const block of toolBlocks) {
+    for (const block of extractionRes.content) {
       if (block.type === "tool_use" && block.name === "save_startup_info") {
-        const fields = block.input as Record<string, unknown>;
-        for (const [key, val] of Object.entries(fields)) {
+        for (const [key, val] of Object.entries(block.input as Record<string, unknown>)) {
           const isEmpty =
             val === undefined ||
             val === null ||
@@ -171,39 +225,29 @@ router.post("/chat", requireAuth, async (req, res): Promise<void> => {
       }
     }
 
-    if (textBlocks.length > 0) {
-      replyText = textBlocks
-        .filter((b) => b.type === "text")
-        .map((b) => (b.type === "text" ? b.text : ""))
-        .join("");
-    } else if (toolBlocks.length > 0 && firstResponse.stop_reason === "tool_use") {
-      // Claude only called the tool without a conversational reply — do a follow-up
-      const toolResults = toolBlocks
-        .filter((b) => b.type === "tool_use")
-        .map((b) => ({
-          type: "tool_result" as const,
-          tool_use_id: b.type === "tool_use" ? b.id : "",
-          content: "Saved.",
-        }));
+    // ── STEP 2: Reply ─────────────────────────────────────────────────────────
+    // Build prompt with merged fields — extraction already happened, so this
+    // prompt accurately knows what's still missing and asks for the right thing.
+    const mergedFields = { ...collectedFields, ...extractedFields };
+    const replyPrompt = buildReplyPrompt(mergedFields, questions, systemPromptIntro);
 
-      const followUp = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [
-          ...formattedMessages,
-          { role: "assistant" as const, content: firstResponse.content },
-          { role: "user" as const, content: toolResults },
-        ],
-      });
+    const replyRes = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 400,
+      system: replyPrompt,
+      messages: formattedMessages, // clean history, no tool-use overhead
+    });
 
-      replyText = followUp.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b.type === "text" ? b.text : ""))
-        .join("");
-    }
+    const replyText = replyRes.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join("");
 
-    res.json({ reply: replyText, extractedFields });
+    // ── currentField: what the bot is now asking about ────────────────────────
+    const stillMissing = REQUIRED_FIELDS.filter((f) => !mergedFields[f]);
+    const currentField = stillMissing[0] ?? null;
+
+    res.json({ reply: replyText, extractedFields, currentField });
   } catch (err) {
     req.log.error({ err }, "Chat endpoint error");
     res.status(500).json({ error: "Failed to process message" });

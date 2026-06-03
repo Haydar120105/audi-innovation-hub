@@ -22,10 +22,10 @@ applicationsTable (PostgreSQL-Tabelle "applications")
 ├── status          ENUM: 'pending'|'routed'|'shortlisted'|'accepted'|'declined'|'archived'
 ├── companyName     TEXT NOT NULL
 ├── website         TEXT nullable
-├── stage           TEXT nullable           z.B. "Seed", "Series A"
-├── teamSize        TEXT nullable           z.B. "5-10"
+├── stage           TEXT nullable           z.B. "seed", "series-a"
+├── teamSize        TEXT nullable           z.B. "6-15"
 ├── clerkUserId     TEXT nullable           ← Clerk User-ID des Einreichers
-├── trackingToken   TEXT UNIQUE (auto: gen_random_uuid)  ← öffentlicher Link, kein Auth
+├── trackingToken   TEXT UNIQUE (auto: gen_random_uuid::text)  ← öffentlicher Link, kein Auth
 │
 ├── transcript      JSONB NOT NULL []       ← [{role: 'user'|'assistant', content: string}]
 ├── structuredData  JSONB nullable          ← KI-extrahiert: {companyName, problemStatement, ...}
@@ -34,12 +34,17 @@ applicationsTable (PostgreSQL-Tabelle "applications")
 │
 ├── notes           TEXT nullable           ← Interne Staff-Notizen (nicht sichtbar für Bewerber)
 │
-└── [Staff-Assessment-Felder]
-    ├── rating          INTEGER nullable     ← 1–5 Sterne
-    ├── nextStep        TEXT nullable        ← freier Text, z.B. "Discovery Call planen"
-    ├── requirements    JSONB nullable       ← [{id, text, done: bool}]
-    ├── milestones      JSONB nullable       ← [{id, title, dueDate?, status: 'pending'|'in_progress'|'done'}]
-    └── kpis            JSONB nullable       ← [{id, metric, target, current, unit?}]
+├── [Staff-Assessment-Felder]
+│   ├── rating          INTEGER nullable     ← 1–5 Sterne
+│   ├── nextStep        TEXT nullable        ← freier Text, z.B. "Discovery Call planen"
+│   ├── requirements    JSONB nullable       ← [{id, text, done: bool}]
+│   ├── milestones      JSONB nullable       ← [{id, title, dueDate?, status: 'pending'|'in_progress'|'done'}]
+│   └── kpis            JSONB nullable       ← [{id, metric, target, current, unit?}]
+│
+└── [Onboarding-Felder — gesetzt wenn Superuser zuweist]
+    ├── assignedEmployee JSONB nullable      ← { name, role, email, department, clerkId }
+    │                                           clerkId verknüpft mit Clerk-User des Staff-Members
+    └── ndaStatus        TEXT nullable       ← 'pending_signature' | 'signed'
 ```
 
 ---
@@ -56,7 +61,29 @@ pending  →  routed  →  shortlisted  →  accepted
 
 - `pending`: Gerade eingetragen, KI-Analyse noch nicht fertig (oder fehlgeschlagen)
 - `routed`: KI-Analyse abgeschlossen, departmentScores gesetzt
-- Alle weiteren Status: Manuelle Staff-Entscheidung via `PATCH /api/applications/:id`
+- Alle weiteren Status: Manuelle Staff-/Superuser-Entscheidung via `PATCH /api/applications/:id`
+
+---
+
+## assignedEmployee — Wichtig
+
+Das Feld steuert die Sichtbarkeit im Staff-Dashboard:
+
+```typescript
+// Backend-Query für audi_staff-Sicht:
+.where(sql`${applicationsTable.assignedEmployee}->>'clerkId' = ${userId}`)
+
+// Struktur die gespeichert wird:
+assignedEmployee: {
+  name: "Max Mustermann",
+  role: "Innovation Manager",
+  email: "m.mustermann@audi.de",
+  department: "Research & Development",
+  clerkId: "user_abc123"    // ← Clerk-ID des Staff-Users
+}
+```
+
+**Staff ohne `clerkId` im assignedEmployee** sieht keine Bewerbungen (leere Liste, nicht Fehler).
 
 ---
 
@@ -94,11 +121,13 @@ Drizzle gibt JSONB-Felder als `unknown` zurück. Immer casten:
 ```typescript
 const scores = app.departmentScores as DepartmentScore[] | null;
 const reqs = app.requirements as { id: string; text: string; done: boolean }[] | null;
+const assigned = app.assignedEmployee as { name: string; role: string; email: string; department: string; clerkId: string } | null;
 ```
 
 Beim Schreiben ebenfalls casten:
 ```typescript
 requirements: body.data.requirements as unknown as Record<string, unknown>[]
+assignedEmployee: body.data.assignedEmployee as unknown as Record<string, unknown>
 ```
 
 ---

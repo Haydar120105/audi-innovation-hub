@@ -69,7 +69,16 @@
 
   --background: 0 0% 4%; /* #0A0A0A */
   --foreground: 0 0% 96%; /* #F5F5F5 */
-  --border: 0 0% 12%; 
+  --border: 0 0% 12%;
+
+  --app-page: oklch(0.12 0.018 285);
+  --app-page-soft: oklch(0.15 0.022 285);
+  --app-surface: oklch(0.19 0.018 285 / 0.76);
+  --app-surface-raised: oklch(0.23 0.022 285 / 0.88);
+  --app-border: oklch(0.92 0.006 285 / 0.09);
+  --app-text: oklch(0.97 0.004 285);
+  --app-text-muted: oklch(0.78 0.008 285 / 0.58);
+  --app-text-faint: oklch(0.78 0.008 285 / 0.34);
   
   --card: 0 0% 7%; /* #111111 */
   --card-foreground: 0 0% 96%;
@@ -112,6 +121,50 @@
   --radius: .5rem; 
 }
 
+.light {
+  /* Platinum-neutral palette — cool blue-gray undertone, no warmth */
+  --background: 218 20% 97%;
+  --foreground: 220 22% 14%;
+  --border: 220 14% 87%;
+  --card: 216 16% 99%;
+  --card-foreground: 220 22% 14%;
+  --card-border: 220 14% 87%;
+  --sidebar: 220 16% 93%;
+  --sidebar-foreground: 220 22% 14%;
+  --sidebar-border: 220 14% 87%;
+  --sidebar-primary: 352 90% 38%;
+  --sidebar-primary-foreground: 218 20% 97%;
+  --sidebar-accent: 220 13% 89%;
+  --sidebar-accent-foreground: 220 22% 14%;
+  --sidebar-ring: 352 90% 38%;
+  --popover: 216 16% 99%;
+  --popover-foreground: 220 22% 14%;
+  --popover-border: 220 14% 87%;
+  --primary: 352 90% 38%;
+  --primary-foreground: 218 20% 97%;
+  --secondary: 220 13% 91%;
+  --secondary-foreground: 220 22% 14%;
+  --muted: 220 11% 92%;
+  --muted-foreground: 220 10% 44%;
+  --accent: 352 90% 38%;
+  --accent-foreground: 218 20% 97%;
+  --destructive: 0 84% 45%;
+  --destructive-foreground: 218 20% 97%;
+  --input: 220 11% 91%;
+  --ring: 352 90% 38%;
+
+  /* oklch — hue 245 keeps everything cool/silver, chroma stays low */
+  --app-page: oklch(0.971 0.004 245);
+  --app-page-soft: oklch(0.945 0.006 243);
+  --app-surface: oklch(0.988 0.003 246 / 0.94);
+  --app-surface-raised: oklch(0.997 0.002 248 / 0.97);
+  --app-border: oklch(0.70 0.006 245 / 0.16);
+  --app-text: oklch(0.18 0.012 248);
+  --app-text-muted: oklch(0.40 0.009 244 / 0.72);
+  --app-text-faint: oklch(0.50 0.007 244 / 0.48);
+  color-scheme: light;
+}
+
 .dark {
   --background: 0 0% 4%;
   --foreground: 0 0% 96%;
@@ -142,6 +195,7 @@
   --destructive-foreground: 0 0% 100%;
   --input: 0 0% 12%;
   --ring: 352 90% 38%;
+  color-scheme: dark;
 }
 
 @layer base {
@@ -164,5 +218,212 @@
   button:not(:disabled):active,
   [role="button"]:not([aria-disabled="true"]):active {
     transform: scale(0.97);
+  }
+}
+
+@layer components {
+  .theme-toggle {
+    background: var(--app-surface-raised);
+    border: 1px solid var(--app-border);
+    color: var(--app-text-muted);
+    box-shadow: 0 14px 34px oklch(0 0 0 / 0.22);
+  }
+
+  .theme-toggle:hover {
+    color: var(--app-text);
+    border-color: oklch(0.56 0.19 24 / 0.42);
+  }
+}
+
+@layer utilities {
+  .light body {
+    background: var(--app-page);
+    color: var(--app-text);
+  }
+
+  .light .bg-\[\#0A0A14\],
+  .light [style*="#0A0A14"],
+  .light [style*="#0D0B1C"],
+  .light [style*="rgb(10, 10, 20)"],
+  .light [style*="rgb(13, 11, 28)"] {
+    background: var(--app-page) !important;
+  }
+
+  .light [style*="#0f0f1e"],
+  .light [style*="rgb(15, 15, 30)"] {
+    background: var(--app-surface-raised) !important;
+  }
+
+  .light [style*="rgba(10,10,20,0.95)"],
+  .light [style*="rgba(10, 10, 20, 0.95)"],
+  .light [style*="rgba(10,10,20,0.85)"],
+  .light [style*="rgba(10, 10, 20, 0.85)"],
+  .light [style*="rgba(8,8,18,0.9)"],
+  .light [style*="rgba(8, 8, 18, 0.9)"] {
+    background: oklch(0.985 0.006 58 / 0.94) !important;
+    border-bottom-color: var(--app-border) !important;
+  }
+
+  .light [style*="rgba(255,255,255,0.02)"],
+  .light [style*="rgba(255, 255, 255, 0.02)"],
+  .light [style*="rgba(255,255,255,0.025)"],
+  .light [style*="rgba(255, 255, 255, 0.025)"],
+  .light [style*="rgba(255,255,255,0.03)"],
+  .light [style*="rgba(255, 255, 255, 0.03)"],
+  .light [style*="rgba(255,255,255,0.04)"],
+  .light [style*="rgba(255, 255, 255, 0.04)"],
+  .light [style*="rgba(255,255,255,0.05)"],
+  .light [style*="rgba(255, 255, 255, 0.05)"],
+  .light [style*="rgba(255,255,255,0.06)"],
+  .light [style*="rgba(255, 255, 255, 0.06)"],
+  .light [style*="rgba(255,255,255,0.07)"],
+  .light [style*="rgba(255, 255, 255, 0.07)"] {
+    background: var(--app-surface) !important;
+    border-color: var(--app-border) !important;
+  }
+
+  .light [style*="rgba(255,255,255,0.08)"],
+  .light [style*="rgba(255, 255, 255, 0.08)"],
+  .light [style*="rgba(255,255,255,0.09)"],
+  .light [style*="rgba(255, 255, 255, 0.09)"],
+  .light [style*="rgba(255,255,255,0.1)"],
+  .light [style*="rgba(255, 255, 255, 0.1)"] {
+    background: var(--app-page-soft) !important;
+    border-color: var(--app-border) !important;
+  }
+
+  .light .text-white {
+    color: var(--app-text) !important;
+  }
+
+  .light .text-white\/80,
+  .light .text-white\/75,
+  .light .text-white\/70,
+  .light .text-white\/65,
+  .light .text-white\/60 {
+    color: var(--app-text-muted) !important;
+  }
+
+  .light .text-white\/55,
+  .light .text-white\/50,
+  .light .text-white\/45,
+  .light .text-white\/40,
+  .light .text-white\/35,
+  .light .text-white\/30 {
+    color: var(--app-text-faint) !important;
+  }
+
+  .light .text-white\/25,
+  .light .text-white\/20,
+  .light .text-white\/15 {
+    color: oklch(0.54 0.007 244 / 0.38) !important;
+  }
+
+  .light [style*="color: rgba(255,255,255,0.85)"],
+  .light [style*="color: rgba(255, 255, 255, 0.85)"],
+  .light [style*="color: rgba(255,255,255,0.8)"],
+  .light [style*="color: rgba(255, 255, 255, 0.8)"],
+  .light [style*="color: rgba(255,255,255,0.75)"],
+  .light [style*="color: rgba(255, 255, 255, 0.75)"],
+  .light [style*="color: rgba(255,255,255,0.7)"],
+  .light [style*="color: rgba(255, 255, 255, 0.7)"],
+  .light [style*="color: rgba(255,255,255,0.65)"],
+  .light [style*="color: rgba(255, 255, 255, 0.65)"],
+  .light [style*="color: rgba(255,255,255,0.6)"],
+  .light [style*="color: rgba(255, 255, 255, 0.6)"] {
+    color: var(--app-text) !important;
+  }
+
+  .light [style*="color: rgba(255,255,255,0.58)"],
+  .light [style*="color: rgba(255, 255, 255, 0.58)"],
+  .light [style*="color: rgba(255,255,255,0.55)"],
+  .light [style*="color: rgba(255, 255, 255, 0.55)"],
+  .light [style*="color: rgba(255,255,255,0.5)"],
+  .light [style*="color: rgba(255, 255, 255, 0.5)"],
+  .light [style*="color: rgba(255,255,255,0.45)"],
+  .light [style*="color: rgba(255, 255, 255, 0.45)"],
+  .light [style*="color: rgba(255,255,255,0.4)"],
+  .light [style*="color: rgba(255, 255, 255, 0.4)"],
+  .light [style*="color: rgba(255,255,255,0.35)"],
+  .light [style*="color: rgba(255, 255, 255, 0.35)"] {
+    color: var(--app-text-muted) !important;
+  }
+
+  .light [style*="color: rgba(255,255,255,0.3)"],
+  .light [style*="color: rgba(255, 255, 255, 0.3)"],
+  .light [style*="color: rgba(255,255,255,0.28)"],
+  .light [style*="color: rgba(255, 255, 255, 0.28)"],
+  .light [style*="color: rgba(255,255,255,0.25)"],
+  .light [style*="color: rgba(255, 255, 255, 0.25)"],
+  .light [style*="color: rgba(255,255,255,0.2)"],
+  .light [style*="color: rgba(255, 255, 255, 0.2)"],
+  .light [style*="color: rgba(255,255,255,0.15)"],
+  .light [style*="color: rgba(255, 255, 255, 0.15)"] {
+    color: var(--app-text-faint) !important;
+  }
+
+  .light [style*="border: 1px solid rgba(255,255,255"],
+  .light [style*="border: 1px solid rgba(255, 255, 255"],
+  .light [style*="border-bottom: 1px solid rgba(255,255,255"],
+  .light [style*="border-bottom: 1px solid rgba(255, 255, 255"] {
+    border-color: var(--app-border) !important;
+  }
+
+  .light .placeholder-white\/25::placeholder,
+  .light .placeholder-white\/20::placeholder {
+    color: oklch(0.50 0.007 244 / 0.44) !important;
+  }
+
+  .light .border-white\/5,
+  .light .border-white\/10,
+  .light .border-white\/15,
+  .light .border-white\/20,
+  .light .border-white\/25 {
+    border-color: var(--app-border) !important;
+  }
+
+  .light .bg-white\/\[0\.02\],
+  .light .bg-white\/5,
+  .light .bg-white\/10 {
+    background-color: var(--app-page-soft) !important;
+  }
+
+  .light input,
+  .light textarea,
+  .light select {
+    color: var(--app-text) !important;
+  }
+
+  .light img[src*="audi-logo"] {
+    filter: none !important;
+  }
+
+  /* ── Missing dark backgrounds not covered above ──────────────────
+     Testimonials partners section (#080810), MoreOpportunities section
+     (#080812), and Benefits CTA gradient (#131124 / #0E0C1B) stay dark
+     in light mode without these overrides — causing white-class text to
+     become dark text on a dark background (invisible). ─────────────── */
+  .light [style*="#080810"],
+  .light [style*="#080812"] {
+    background: var(--app-page) !important;
+  }
+
+  .light [style*="#131124"],
+  .light [style*="#0E0C1B"] {
+    background: var(--app-page-soft) !important;
+    border-color: var(--app-border) !important;
+  }
+
+  /* ── Homepage section headings: Audi-Rot in light mode ──────────
+     All large section headings use font-light text-white. In light mode
+     they must be colored #BB0A21 so they match the red section labels
+     and remain clearly visible against the light background.
+     font-light scopes this to section headings — card/page h2s use
+     font-semibold or font-medium and are not affected. ──────────── */
+  .light h2.font-light.text-white,
+  .light h2.font-light.text-white span,
+  .light h3.text-xl.font-semibold.text-white,
+  .light h3.text-xl.font-semibold.text-white span {
+    color: #BB0A21 !important;
   }
 }

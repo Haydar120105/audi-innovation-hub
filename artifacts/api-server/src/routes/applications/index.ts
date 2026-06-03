@@ -52,7 +52,7 @@ router.post("/applications", requireAuth, async (req, res): Promise<void> => {
         structuredData: analysis.structuredData as unknown as Record<string, unknown>,
         departmentScores: analysis.departmentScores as unknown as Record<string, unknown>[],
         businessCases: analysis.businessCases as unknown as Record<string, unknown>[],
-        status: "routed",
+        status: "analyzed",
       })
       .where(eq(applicationsTable.id, app.id))
       .returning();
@@ -87,12 +87,19 @@ router.get("/applications", requireAuth, async (req, res): Promise<void> => {
   }
 
   if (role === "audi_staff") {
-    // Staff only sees applications assigned to them via assignedEmployee.clerkId
+    // Staff sees all applications; their department's apps are sorted first
+    const departmentId = clerkUser.publicMetadata?.["departmentId"] as string | undefined;
     const apps = await db
       .select()
       .from(applicationsTable)
-      .where(sql`${applicationsTable.assignedEmployee}->>'clerkId' = ${userId}`)
-      .orderBy(desc(applicationsTable.createdAt));
+      .orderBy(
+        departmentId
+          ? sql`CASE WHEN EXISTS (
+              SELECT 1 FROM jsonb_array_elements(${applicationsTable.departmentScores}) elem
+              WHERE elem->>'departmentId' = ${departmentId}
+            ) THEN 0 ELSE 1 END, ${desc(applicationsTable.createdAt)}`
+          : desc(applicationsTable.createdAt)
+      );
     res.json(apps);
     return;
   }
@@ -129,7 +136,39 @@ router.get("/applications/track/:token", async (req, res): Promise<void> => {
     status: app.status,
     createdAt: app.createdAt,
     departmentScores: app.departmentScores,
+    hackathonSlot: app.hackathonSlot ?? null,
+    applicantType: (app.structuredData as Record<string, unknown> | null)?.["applicantType"] ?? null,
   });
+});
+
+const VALID_HACKATHON_SLOTS = ["jul-2026", "aug-2026", "sep-2026", "oct-2026"];
+
+// POST /applications/track/:token/hackathon-slot — public (token as identity)
+router.post("/applications/track/:token/hackathon-slot", async (req, res): Promise<void> => {
+  const params = TrackApplicationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const { slot } = req.body as { slot?: string };
+  if (!slot || !VALID_HACKATHON_SLOTS.includes(slot)) {
+    res.status(400).json({ error: "Invalid slot. Must be one of: " + VALID_HACKATHON_SLOTS.join(", ") });
+    return;
+  }
+
+  const [updated] = await db
+    .update(applicationsTable)
+    .set({ hackathonSlot: slot })
+    .where(eq(applicationsTable.trackingToken, params.data.token))
+    .returning({ hackathonSlot: applicationsTable.hackathonSlot });
+
+  if (!updated) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
+
+  res.json({ ok: true, slot: updated.hackathonSlot });
 });
 
 // GET /applications/:id — audi_staff or owner
@@ -158,12 +197,7 @@ router.get("/applications/:id", requireAuth, async (req, res): Promise<void> => 
   if (role === "superuser") {
     // Superuser can see any application
   } else if (role === "audi_staff") {
-    // Staff can only access applications assigned to them
-    const assignedClerkId = (app.assignedEmployee as Record<string, unknown> | null)?.["clerkId"] as string | undefined;
-    if (assignedClerkId !== ownerId) {
-      res.status(403).json({ error: "Access denied. This application is not assigned to you." });
-      return;
-    }
+    // Staff can access all applications (same as the list endpoint)
   } else if (app.clerkUserId !== ownerId) {
     // Regular user can only see their own application
     res.status(403).json({ error: "Access denied." });
@@ -171,6 +205,40 @@ router.get("/applications/:id", requireAuth, async (req, res): Promise<void> => 
   }
 
   res.json(app);
+});
+
+// GET /applications/:id/applicant-contact — returns applicant's email for meeting invites (staff/superuser)
+router.get("/applications/:id/applicant-contact", requireAudiStaff, async (req, res): Promise<void> => {
+  const params = GetApplicationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [app] = await db
+    .select({ id: applicationsTable.id, clerkUserId: applicationsTable.clerkUserId, companyName: applicationsTable.companyName })
+    .from(applicationsTable)
+    .where(eq(applicationsTable.id, params.data.id));
+
+  if (!app) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
+
+  if (!app.clerkUserId) {
+    res.status(404).json({ error: "No applicant account linked to this application" });
+    return;
+  }
+
+  const { createClerkClient: cc3 } = await import("@clerk/express");
+  const applicant = await cc3({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(app.clerkUserId);
+  const email = applicant.emailAddresses?.[0]?.emailAddress ?? "";
+
+  res.json({
+    email,
+    firstName: applicant.firstName ?? "",
+    companyName: app.companyName,
+  });
 });
 
 // PATCH /applications/:id — audi_staff (only their assigned apps) or superuser
@@ -187,15 +255,21 @@ router.patch("/applications/:id", requireAudiStaff, async (req, res): Promise<vo
   const patcherUser = await cc2({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(patcherId);
   const patcherRole = patcherUser.publicMetadata?.["role"] as string | undefined;
 
-  if (patcherRole === "audi_staff") {
-    const [existing] = await db
-      .select({ assignedEmployee: applicationsTable.assignedEmployee })
-      .from(applicationsTable)
-      .where(eq(applicationsTable.id, params.data.id));
-    const assignedClerkId = (existing?.assignedEmployee as Record<string, unknown> | null)?.["clerkId"] as string | undefined;
-    if (assignedClerkId !== patcherId) {
-      res.status(403).json({ error: "Access denied. This application is not assigned to you." });
-      return;
+  // audi_staff can patch notes/rating/nextStep/etc freely, but status changes are restricted
+  const body2 = UpdateApplicationBody.safeParse(req.body);
+  if (body2.success && patcherRole === "audi_staff") {
+    const statusChange = body2.data.status;
+    if (statusChange && statusChange !== (await db.select({ status: applicationsTable.status }).from(applicationsTable).where(eq(applicationsTable.id, params.data.id)).then(r => r[0]?.status))) {
+      if (statusChange !== "approved" && statusChange !== "declined") {
+        res.status(403).json({ error: "Staff may only set status to approved or declined." });
+        return;
+      }
+      const existingForCheck = await db.select({ assignedEmployee: applicationsTable.assignedEmployee }).from(applicationsTable).where(eq(applicationsTable.id, params.data.id));
+      const assignedClerkId = (existingForCheck[0]?.assignedEmployee as Record<string, unknown> | null)?.["clerkId"] as string | undefined;
+      if (assignedClerkId !== patcherId) {
+        res.status(403).json({ error: "Only the assigned ambassador may approve or decline." });
+        return;
+      }
     }
   }
 
@@ -221,6 +295,14 @@ router.patch("/applications/:id", requireAudiStaff, async (req, res): Promise<vo
     return;
   }
 
+  // Auto-advance to 'assigned' when superuser sets an ambassador on an 'analyzed' app
+  if (updates.assignedEmployee && !updates.status) {
+    const [currentApp] = await db.select({ status: applicationsTable.status }).from(applicationsTable).where(eq(applicationsTable.id, params.data.id));
+    if (currentApp?.status === "analyzed") {
+      updates.status = "assigned";
+    }
+  }
+
   const [updated] = await db
     .update(applicationsTable)
     .set(updates)
@@ -233,6 +315,65 @@ router.patch("/applications/:id", requireAudiStaff, async (req, res): Promise<vo
   }
 
   req.log.info({ id: updated.id, ...updates }, "Application updated");
+  res.json(updated);
+});
+
+// POST /applications/:id/claim — staff assigns themselves as ambassador
+router.post("/applications/:id/claim", requireAudiStaff, async (req, res): Promise<void> => {
+  const params = GetApplicationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const claimerId = getUserId(req)!;
+  const { createClerkClient: cc3 } = await import("@clerk/express");
+  const claimer = await cc3({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(claimerId);
+
+  const [existing] = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.id, params.data.id));
+
+  if (!existing) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
+  if (existing.status !== "analyzed") {
+    res.status(409).json({ error: `Cannot claim — status is "${existing.status}", expected "analyzed".` });
+    return;
+  }
+  if ((existing.assignedEmployee as Record<string, unknown> | null)?.["clerkId"]) {
+    res.status(409).json({ error: "Application is already assigned to someone." });
+    return;
+  }
+
+  const deptId = claimer.publicMetadata?.["departmentId"] as string | undefined;
+  const DEPT_NAMES: Record<string, string> = {
+    production: "Production & Manufacturing",
+    rd: "Research & Development",
+    design: "Design Studio",
+    logistics: "Logistics & Supply Chain",
+    sales: "Sales & Customer Experience",
+    digital: "Digital & IT",
+  };
+
+  const [updated] = await db
+    .update(applicationsTable)
+    .set({
+      status: "assigned",
+      assignedEmployee: {
+        name: `${claimer.firstName ?? ""} ${claimer.lastName ?? ""}`.trim() || (claimer.emailAddresses[0]?.emailAddress ?? ""),
+        role: (claimer.publicMetadata?.["role"] as string | undefined) ?? "audi_staff",
+        email: claimer.emailAddresses[0]?.emailAddress ?? "",
+        department: deptId ? (DEPT_NAMES[deptId] ?? deptId) : "Audi",
+        clerkId: claimerId,
+      },
+    })
+    .where(eq(applicationsTable.id, params.data.id))
+    .returning();
+
+  req.log.info({ id: updated.id, claimerId }, "Application claimed by staff");
   res.json(updated);
 });
 

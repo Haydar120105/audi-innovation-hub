@@ -1,0 +1,407 @@
+/* ━━━ theme-overrides.css ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Loaded separately from index.css so it bypasses Tailwind v4's compiler
+   and is guaranteed to reach the browser as plain CSS.
+
+   Rules outside @layer have higher cascade priority than any @layer rule,
+   so these overrides beat Tailwind's @layer utilities without !important
+   for class-based overrides. Inline-style overrides still need !important.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* ─── CSS Custom Properties ─────────────────────────────────────────────── */
+
+:root {
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --background: 0 0% 4%;
+  --foreground: 0 0% 96%;
+  --border: 0 0% 12%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 96%;
+  --card-border: 0 0% 12%;
+  --sidebar: 0 0% 7%;
+  --sidebar-foreground: 0 0% 96%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-primary: 352 90% 38%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 15%;
+  --sidebar-accent-foreground: 0 0% 96%;
+  --sidebar-ring: 352 90% 38%;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 96%;
+  --popover-border: 0 0% 12%;
+  --primary: 352 90% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 70%;
+  --accent: 352 90% 38%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 0 0% 12%;
+  --ring: 352 90% 38%;
+  --radius: 0.5rem;
+
+  --app-page: oklch(0.12 0.018 285);
+  --app-page-soft: oklch(0.15 0.022 285);
+  --app-surface: oklch(0.19 0.018 285 / 0.76);
+  --app-surface-raised: oklch(0.23 0.022 285 / 0.88);
+  --app-border: oklch(0.92 0.006 285 / 0.09);
+  --app-text: oklch(0.97 0.004 285);
+  --app-text-muted: oklch(0.78 0.008 285 / 0.58);
+  --app-text-faint: oklch(0.78 0.008 285 / 0.34);
+
+  --app-font-sans: 'Inter', sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: Menlo, monospace;
+}
+
+.light {
+  --background: 218 20% 97%;
+  --foreground: 220 22% 14%;
+  --border: 220 14% 87%;
+  --card: 216 16% 99%;
+  --card-foreground: 220 22% 14%;
+  --card-border: 220 14% 87%;
+  --sidebar: 220 16% 93%;
+  --sidebar-foreground: 220 22% 14%;
+  --sidebar-border: 220 14% 87%;
+  --sidebar-primary: 352 90% 38%;
+  --sidebar-primary-foreground: 218 20% 97%;
+  --sidebar-accent: 220 13% 89%;
+  --sidebar-accent-foreground: 220 22% 14%;
+  --sidebar-ring: 352 90% 38%;
+  --popover: 216 16% 99%;
+  --popover-foreground: 220 22% 14%;
+  --popover-border: 220 14% 87%;
+  --primary: 352 90% 38%;
+  --primary-foreground: 218 20% 97%;
+  --secondary: 220 13% 91%;
+  --secondary-foreground: 220 22% 14%;
+  --muted: 220 11% 92%;
+  --muted-foreground: 220 10% 44%;
+  --accent: 352 90% 38%;
+  --accent-foreground: 218 20% 97%;
+  --destructive: 0 84% 45%;
+  --destructive-foreground: 218 20% 97%;
+  --input: 220 11% 91%;
+  --ring: 352 90% 38%;
+
+  --app-page: oklch(0.971 0.004 245);
+  --app-page-soft: oklch(0.945 0.006 243);
+  --app-surface: oklch(0.988 0.003 246 / 0.94);
+  --app-surface-raised: oklch(0.997 0.002 248 / 0.97);
+  --app-border: oklch(0.70 0.006 245 / 0.22);
+  --app-text: oklch(0.12 0.014 248);
+  --app-text-muted: oklch(0.30 0.011 248);
+  --app-text-faint: oklch(0.46 0.008 246);
+}
+
+.dark {
+  --background: 0 0% 4%;
+  --foreground: 0 0% 96%;
+  --border: 0 0% 12%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 96%;
+  --card-border: 0 0% 12%;
+  --sidebar: 0 0% 7%;
+  --sidebar-foreground: 0 0% 96%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-primary: 352 90% 38%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 15%;
+  --sidebar-accent-foreground: 0 0% 96%;
+  --sidebar-ring: 352 90% 38%;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 96%;
+  --popover-border: 0 0% 12%;
+  --primary: 352 90% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 70%;
+  --accent: 352 90% 38%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 0 0% 12%;
+  --ring: 352 90% 38%;
+
+  --app-page: oklch(0.12 0.018 285);
+  --app-page-soft: oklch(0.15 0.022 285);
+  --app-surface: oklch(0.19 0.018 285 / 0.76);
+  --app-surface-raised: oklch(0.23 0.022 285 / 0.88);
+  --app-border: oklch(0.92 0.006 285 / 0.09);
+  --app-text: oklch(0.97 0.004 285);
+  --app-text-muted: oklch(0.78 0.008 285 / 0.58);
+  --app-text-faint: oklch(0.78 0.008 285 / 0.34);
+}
+
+/* ─── Base: press-feedback on buttons ───────────────────────────────────── */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  transition: transform 160ms var(--ease-out);
+}
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.97);
+}
+
+/* ─── Light mode — section/page backgrounds (Tailwind utility classes) ───── */
+
+.light .bg-\[\#0A0A14\] {
+  background-color: oklch(0.971 0.004 245) !important;
+}
+
+.light .bg-white\/\[0\.02\],
+.light .bg-white\/\[0\.025\],
+.light .bg-white\/5 {
+  background-color: oklch(0.960 0.005 244) !important;
+}
+
+.light .bg-white\/10 {
+  background-color: oklch(0.948 0.006 243) !important;
+}
+
+.light .hover\:bg-white\/\[0\.05\]:hover,
+.light .hover\:bg-white\/\[0\.1\]:hover {
+  background-color: oklch(0.950 0.006 243) !important;
+}
+
+/* ─── Light mode — text (Tailwind opacity utilities) ─────────────────────── */
+
+.light .text-white {
+  color: oklch(0.12 0.014 248) !important;
+}
+.light .text-white\/90,
+.light .text-white\/85 {
+  color: oklch(0.16 0.013 248) !important;
+}
+.light .text-white\/80,
+.light .text-white\/75,
+.light .text-white\/70,
+.light .text-white\/65,
+.light .text-white\/60 {
+  color: oklch(0.28 0.011 248) !important;
+}
+.light .text-white\/55,
+.light .text-white\/50,
+.light .text-white\/45,
+.light .text-white\/40,
+.light .text-white\/35,
+.light .text-white\/30 {
+  color: oklch(0.42 0.009 246) !important;
+}
+.light .text-white\/25,
+.light .text-white\/20,
+.light .text-white\/15 {
+  color: oklch(0.52 0.007 244) !important;
+}
+
+/* ─── Light mode — font weight (thin weights are unreadable on white) ────── */
+.light .font-light {
+  font-weight: 400 !important;
+}
+
+/* ─── Light mode — preserve white text on colored (Audi Red) backgrounds ── */
+/* Must come after text-white override so !important wins by source order.   */
+
+/* Tailwind class bg-[#BB0A21] */
+.light .bg-\[\#BB0A21\],
+.light .hover\:bg-\[\#A0081C\] {
+  color: #ffffff !important;
+}
+.light .bg-\[\#BB0A21\] *,
+.light .hover\:bg-\[\#A0081C\] * {
+  color: #ffffff !important;
+}
+
+/* Inline style background — only apply white text to elements whose BACKGROUND
+   is Audi Red. We prefix with "background" so we never accidentally match
+   section labels that use #BB0A21 as their TEXT color — those must stay red.
+   High-specificity variants (0,3,0) beat .text-white (0,2,0) so source order
+   is irrelevant — these always win. */
+.light [style*="background: rgb(187, 10, 33)"],
+.light [style*="background-color: rgb(187, 10, 33)"],
+.light [style*="background: #BB0A21"],
+.light [style*="background:#BB0A21"] {
+  color: #ffffff !important;
+}
+.light [style*="background: rgb(187, 10, 33)"] *,
+.light [style*="background-color: rgb(187, 10, 33)"] *,
+.light [style*="background: #BB0A21"] *,
+.light [style*="background:#BB0A21"] * {
+  color: #ffffff !important;
+}
+
+/* Higher-specificity override — wins over .text-white regardless of source order */
+.light.light [style*="background: rgb(187, 10, 33)"],
+.light.light [style*="background-color: rgb(187, 10, 33)"],
+.light.light [style*="background: #BB0A21"],
+.light.light [style*="background:#BB0A21"] {
+  color: #ffffff !important;
+}
+.light.light [style*="background: rgb(187, 10, 33)"] *,
+.light.light [style*="background-color: rgb(187, 10, 33)"] *,
+.light.light [style*="background: #BB0A21"] *,
+.light.light [style*="background:#BB0A21"] * {
+  color: #ffffff !important;
+}
+
+/* ─── Light mode — borders ────────────────────────────────────────────────── */
+
+.light .border-white\/5,
+.light .border-white\/10,
+.light .border-white\/15,
+.light .border-white\/20,
+.light .border-white\/25 {
+  border-color: oklch(0.70 0.006 245 / 0.16) !important;
+}
+
+/* ─── Light mode — placeholder text ─────────────────────────────────────── */
+
+.light .placeholder-white\/25::placeholder,
+.light .placeholder-white\/20::placeholder {
+  color: oklch(0.50 0.007 244 / 0.44) !important;
+}
+
+/* ─── Light mode — form inputs ───────────────────────────────────────────── */
+
+.light input,
+.light textarea,
+.light select {
+  color: oklch(0.18 0.012 248) !important;
+}
+
+/* ─── Light mode — Featured badge (MoreOpportunities) ───────────────────── */
+
+.light .featured-badge {
+  background: #BB0A21 !important;
+  color: #ffffff !important;
+  border-color: #BB0A21 !important;
+}
+
+/* ─── Light mode — inline style overrides ────────────────────────────────── */
+/* These need !important to beat inline styles (which don't use !important). */
+
+/* Dark section backgrounds (browser serializes hex → rgb in style attribute) */
+/* rgb(10, 10, 20) = #0A0A14  |  rgb(13, 11, 28) = #0D0B1C  |  rgb(12, 11, 30) = #0C0B1E */
+/* rgb(8, 8, 16)  = #080810   |  rgb(8, 8, 18)  = #080812   |  rgb(15, 15, 30) = #0f0f1e  */
+/* rgb(19, 17, 36)= #131124   |  rgb(14, 12, 27)= #0E0C1B                                  */
+.light [style*="rgb(10, 10, 20)"],
+.light [style*="rgb(13, 11, 28)"],
+.light [style*="rgb(13, 13, 31)"],
+.light [style*="rgb(12, 11, 30)"],
+.light [style*="rgb(8, 8, 16)"],
+.light [style*="rgb(8, 8, 18)"],
+.light [style*="rgb(15, 15, 30)"],
+.light [style*="rgb(19, 17, 36)"],
+.light [style*="rgb(14, 12, 27)"] {
+  background: oklch(0.971 0.004 245) !important;
+}
+
+/* White-alpha card/surface backgrounds */
+.light [style*="rgba(255,255,255,0.02)"],
+.light [style*="rgba(255, 255, 255, 0.02)"],
+.light [style*="rgba(255,255,255,0.025)"],
+.light [style*="rgba(255, 255, 255, 0.025)"],
+.light [style*="rgba(255,255,255,0.03)"],
+.light [style*="rgba(255, 255, 255, 0.03)"],
+.light [style*="rgba(255,255,255,0.04)"],
+.light [style*="rgba(255, 255, 255, 0.04)"],
+.light [style*="rgba(255,255,255,0.045)"],
+.light [style*="rgba(255, 255, 255, 0.045)"],
+.light [style*="rgba(255,255,255,0.05)"],
+.light [style*="rgba(255, 255, 255, 0.05)"],
+.light [style*="rgba(255,255,255,0.06)"],
+.light [style*="rgba(255, 255, 255, 0.06)"],
+.light [style*="rgba(255,255,255,0.07)"],
+.light [style*="rgba(255, 255, 255, 0.07)"] {
+  background: oklch(0.988 0.003 246 / 0.94) !important;
+  border-color: oklch(0.70 0.006 245 / 0.16) !important;
+}
+
+.light [style*="rgba(255,255,255,0.08)"],
+.light [style*="rgba(255, 255, 255, 0.08)"],
+.light [style*="rgba(255,255,255,0.09)"],
+.light [style*="rgba(255, 255, 255, 0.09)"],
+.light [style*="rgba(255,255,255,0.1)"],
+.light [style*="rgba(255, 255, 255, 0.1)"] {
+  background: oklch(0.945 0.006 243) !important;
+  border-color: oklch(0.70 0.006 245 / 0.16) !important;
+}
+
+/* Glassmorphism nav/header backgrounds */
+.light [style*="rgba(10,10,20,0.95)"],
+.light [style*="rgba(10, 10, 20, 0.95)"],
+.light [style*="rgba(10,10,20,0.85)"],
+.light [style*="rgba(10, 10, 20, 0.85)"],
+.light [style*="rgba(8,8,18,0.9)"],
+.light [style*="rgba(8, 8, 18, 0.9)"] {
+  background: oklch(0.985 0.004 245 / 0.94) !important;
+  border-bottom-color: oklch(0.70 0.006 245 / 0.16) !important;
+}
+
+/* DeptCard popup (PlantScene) */
+.light [style*="rgba(14,13,30,0.97)"],
+.light [style*="rgba(14, 13, 30, 0.97)"] {
+  background: oklch(0.997 0.002 248 / 0.97) !important;
+}
+
+/* Inline text colors */
+.light [style*="color: rgba(255,255,255,0.9)"],
+.light [style*="color: rgba(255, 255, 255, 0.9)"],
+.light [style*="color: rgba(255,255,255,0.85)"],
+.light [style*="color: rgba(255, 255, 255, 0.85)"],
+.light [style*="color: rgba(255,255,255,0.8)"],
+.light [style*="color: rgba(255, 255, 255, 0.8)"],
+.light [style*="color: rgba(255,255,255,0.75)"],
+.light [style*="color: rgba(255, 255, 255, 0.75)"],
+.light [style*="color: rgba(255,255,255,0.7)"],
+.light [style*="color: rgba(255, 255, 255, 0.7)"],
+.light [style*="color: rgba(255,255,255,0.65)"],
+.light [style*="color: rgba(255, 255, 255, 0.65)"],
+.light [style*="color: rgba(255,255,255,0.6)"],
+.light [style*="color: rgba(255, 255, 255, 0.6)"] {
+  color: oklch(0.16 0.013 248) !important;
+}
+
+.light [style*="color: rgba(255,255,255,0.58)"],
+.light [style*="color: rgba(255, 255, 255, 0.58)"],
+.light [style*="color: rgba(255,255,255,0.55)"],
+.light [style*="color: rgba(255, 255, 255, 0.55)"],
+.light [style*="color: rgba(255,255,255,0.5)"],
+.light [style*="color: rgba(255, 255, 255, 0.5)"],
+.light [style*="color: rgba(255,255,255,0.45)"],
+.light [style*="color: rgba(255, 255, 255, 0.45)"],
+.light [style*="color: rgba(255,255,255,0.4)"],
+.light [style*="color: rgba(255, 255, 255, 0.4)"],
+.light [style*="color: rgba(255,255,255,0.35)"],
+.light [style*="color: rgba(255, 255, 255, 0.35)"] {
+  color: oklch(0.28 0.011 248) !important;
+}
+
+.light [style*="color: rgba(255,255,255,0.3)"],
+.light [style*="color: rgba(255, 255, 255, 0.3)"],
+.light [style*="color: rgba(255,255,255,0.28)"],
+.light [style*="color: rgba(255, 255, 255, 0.28)"],
+.light [style*="color: rgba(255,255,255,0.25)"],
+.light [style*="color: rgba(255, 255, 255, 0.25)"],
+.light [style*="color: rgba(255,255,255,0.2)"],
+.light [style*="color: rgba(255, 255, 255, 0.2)"],
+.light [style*="color: rgba(255,255,255,0.15)"],
+.light [style*="color: rgba(255, 255, 255, 0.15)"] {
+  color: oklch(0.42 0.009 246) !important;
+}
+
+/* Inline border colors */
+.light [style*="border: 1px solid rgba(255,255,255"],
+.light [style*="border: 1px solid rgba(255, 255, 255"],
+.light [style*="border-bottom: 1px solid rgba(255,255,255"],
+.light [style*="border-bottom: 1px solid rgba(255, 255, 255"] {
+  border-color: oklch(0.70 0.006 245 / 0.16) !important;
+}

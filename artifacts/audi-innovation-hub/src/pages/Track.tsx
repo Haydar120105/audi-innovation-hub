@@ -1,38 +1,39 @@
 import { useParams, Link } from "wouter";
 import { useTrackApplication } from "@workspace/api-client-react";
+import HackathonInvite from "../components/HackathonInvite";
 
 const AUDI_RED = "#BB0A21";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; description: string }> = {
   pending: {
-    label: "Under Review",
+    label: "In Analyse",
     color: "rgba(255,200,50,0.9)",
-    description: "Your application has been received and is currently being reviewed by our team.",
+    description: "Deine Bewerbung wird von unserer KI analysiert. Das dauert in der Regel wenige Minuten.",
   },
-  routed: {
-    label: "Matched",
+  analyzed: {
+    label: "Analysiert",
     color: "rgba(100,180,255,0.9)",
-    description: "Your application has been analysed and matched with relevant Audi departments.",
+    description: "Die KI-Analyse ist abgeschlossen. Deine Bewerbung wird jetzt an passende Audi-Abteilungen weitergeleitet.",
   },
-  shortlisted: {
-    label: "Shortlisted",
-    color: "rgba(120,220,130,0.9)",
-    description: "Congratulations — your startup has been shortlisted for further consideration.",
+  assigned: {
+    label: "Ambassador zugewiesen",
+    color: "rgba(167,139,250,0.9)",
+    description: "Dir wurde ein persönlicher Startup Ambassador bei Audi zugewiesen — er nimmt bald Kontakt auf.",
   },
-  accepted: {
-    label: "Accepted",
+  approved: {
+    label: "Erstkontakt hergestellt",
     color: "rgba(80,200,100,0.9)",
-    description: "Welcome to the Audi Innovation Hub! Your application has been accepted.",
+    description: "Dein Audi Ambassador hat sich gemeldet. Schaut gemeinsam auf die nächsten Schritte.",
   },
   declined: {
-    label: "Not Selected",
+    label: "Nicht weitergeleitet",
     color: "rgba(180,180,180,0.9)",
-    description: "Thank you for applying. Unfortunately we are not moving forward at this time.",
+    description: "Diese Bewerbung wurde leider nicht weitergeleitet. Du kannst dich gerne erneut bewerben.",
   },
   archived: {
-    label: "Archived",
+    label: "Archiviert",
     color: "rgba(150,150,150,0.9)",
-    description: "This application has been archived.",
+    description: "Diese Bewerbung wurde archiviert.",
   },
 };
 
@@ -121,7 +122,15 @@ export default function Track() {
         </div>
       )}
 
-      {data && (
+      {data && (() => {
+        const HACKATHON_TYPES = ["student_team", "pre_seed_idea", "solo_founder", "university_research"];
+        const scores = data.departmentScores ?? [];
+        const maxScore = scores.length > 0 ? Math.max(...scores.map((s) => s.score)) : 100;
+        const showHackathon =
+          maxScore < 60 ||
+          data.hackathonSlot != null ||
+          (data.applicantType != null && HACKATHON_TYPES.includes(data.applicantType));
+        return (
         <div className="max-w-2xl w-full" style={{ animation: "fadeUp 0.6s ease forwards" }}>
           <div className="text-center mb-10">
             <p className="text-xs tracking-[0.25em] font-semibold uppercase mb-4" style={{ color: AUDI_RED }}>
@@ -163,6 +172,16 @@ export default function Track() {
             </div>
           )}
 
+          {/* Hackathon invitation for low-fit / hackathon-type applicants */}
+          {showHackathon && (
+            <div className="mb-8">
+              <HackathonInvite
+                trackingToken={token}
+                currentSlot={data.hackathonSlot ?? null}
+              />
+            </div>
+          )}
+
           <div className="flex flex-col items-center gap-3 pt-2">
             <p className="text-white/20 text-xs">Share your tracking link</p>
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-sm w-full max-w-sm"
@@ -172,7 +191,8 @@ export default function Track() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

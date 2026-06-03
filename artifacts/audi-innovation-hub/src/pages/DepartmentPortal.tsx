@@ -102,12 +102,12 @@ const DEPARTMENTS = [
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string }> = {
-    pending: { label: "Pending", color: "#d97706" },
-    routed: { label: "Analysed", color: "#16a34a" },
-    shortlisted: { label: "Shortlisted", color: "#2563eb" },
-    accepted: { label: "Accepted", color: "#059669" },
-    declined: { label: "Declined", color: "#dc2626" },
-    archived: { label: "Archived", color: "#6b7280" },
+    pending:  { label: "In Analyse",  color: "#d97706" },
+    analyzed: { label: "Analysiert",  color: "#3b82f6" },
+    assigned: { label: "Zugewiesen",  color: "#8b5cf6" },
+    approved: { label: "Erstkontakt", color: "#059669" },
+    declined: { label: "Abgelehnt",   color: "#dc2626" },
+    archived: { label: "Archiviert",  color: "#6b7280" },
   };
   const { label, color } = map[status] ?? { label: status, color: "#6b7280" };
   return (
@@ -271,17 +271,17 @@ function ApplicationRow({
 
       <div className="flex items-center gap-2 flex-wrap">
         <ActionButton
-          label="Shortlist"
-          active={app.status === "shortlisted"}
-          color="#2563eb"
-          onClick={() => handleStatus(ApplicationUpdateInputStatus.shortlisted)}
+          label="Zuweisen"
+          active={app.status === "assigned"}
+          color="#8b5cf6"
+          onClick={() => handleStatus(ApplicationUpdateInputStatus.assigned)}
           disabled={isPending}
         />
         <ActionButton
-          label="Accept"
-          active={app.status === "accepted"}
+          label="Erstkontakt"
+          active={app.status === "approved"}
           color="#059669"
-          onClick={() => handleStatus(ApplicationUpdateInputStatus.accepted)}
+          onClick={() => handleStatus(ApplicationUpdateInputStatus.approved)}
           disabled={isPending}
         />
         <ActionButton
@@ -518,10 +518,10 @@ export function DepartmentView() {
 
   const totalCount = matched.length;
   const shortlistedCount = matched.filter(
-    ({ app }) => app.status === "shortlisted",
+    ({ app }) => app.status === "assigned",
   ).length;
   const acceptedCount = matched.filter(
-    ({ app }) => app.status === "accepted",
+    ({ app }) => app.status === "approved",
   ).length;
   const topScore = matched[0]?.score.score ?? 0;
 

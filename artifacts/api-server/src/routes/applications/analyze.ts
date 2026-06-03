@@ -1,5 +1,8 @@
+import { eq } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { db, hubConfigTable } from "@workspace/db";
 import { logger } from "../../lib/logger";
+import { DEFAULT_ANALYSIS_PROMPT } from "../hub-config-defaults";
 
 export interface TranscriptMessage {
   role: string;
@@ -34,6 +37,36 @@ const DEPARTMENTS = [
   { id: "digital", name: "Digital & IT" },
 ];
 
+// ── In-memory prompt cache (60 s TTL) — same pattern as chat.ts ──────────────
+let cachedPrompt: string | null = null;
+let cacheExpiry = 0;
+const CACHE_TTL = 60_000;
+
+async function getAnalysisPrompt(): Promise<string> {
+  if (Date.now() < cacheExpiry && cachedPrompt !== null) return cachedPrompt;
+
+  try {
+    const rows = await db
+      .select()
+      .from(hubConfigTable)
+      .where(eq(hubConfigTable.key, "analysis_prompt"));
+
+    cachedPrompt = (rows[0]?.value as string | null) ?? DEFAULT_ANALYSIS_PROMPT;
+  } catch {
+    // DB unavailable — fall back to hardcoded default silently
+    cachedPrompt = DEFAULT_ANALYSIS_PROMPT;
+  }
+
+  cacheExpiry = Date.now() + CACHE_TTL;
+  return cachedPrompt;
+}
+
+/** Call this after a successful PUT /admin/config/analysis_prompt to bust the cache immediately. */
+export function bustAnalysisPromptCache(): void {
+  cachedPrompt = null;
+  cacheExpiry = 0;
+}
+
 export async function analyzeApplication(
   transcript: TranscriptMessage[],
   companyName: string,
@@ -42,46 +75,17 @@ export async function analyzeApplication(
     .map((m) => `${m.role === "assistant" ? "Interviewer" : "Applicant"}: ${m.content}`)
     .join("\n");
 
-  const prompt = `You are an expert innovation analyst at Audi AG. You have just reviewed a startup application interview transcript for the Audi Innovation Hub program.
+  // Build the departments JSON snippet that replaces {{departmentsList}}
+  const departmentsList = DEPARTMENTS.map(
+    (d) =>
+      `{"departmentId": "${d.id}", "departmentName": "${d.name}", "score": <0-100>, "justification": "<one sentence>"}`,
+  ).join(",\n    ");
 
-Company: ${companyName}
-
-Interview Transcript:
-${transcriptText}
-
-Your task is to analyze this startup and return a JSON response with exactly this structure:
-
-{
-  "structuredData": {
-    "companyName": "...",
-    "problemStatement": "...",
-    "solution": "...",
-    "technology": "...",
-    "stage": "...",
-    "teamSize": "...",
-    "traction": "...",
-    "targetCollaboration": "...",
-    "pitchDeckUrl": "...",
-    "website": "..."
-  },
-  "departmentScores": [
-    ${DEPARTMENTS.map((d) => `{"departmentId": "${d.id}", "departmentName": "${d.name}", "score": <0-100>, "justification": "<one sentence>"}`).join(",\n    ")}
-  ],
-  "businessCases": [
-    {
-      "departmentId": "<id of top 2 departments by score>",
-      "departmentName": "<name>",
-      "brief": "<200-word business case brief explaining why this startup would be valuable for this Audi department, what the collaboration could look like, and what business outcomes are possible>"
-    }
-  ]
-}
-
-Scoring guidelines:
-- Score 0-100 on how relevant this startup is for each department
-- Consider technology fit, use cases, and potential for pilot projects
-- Only include business cases for the top 2 scoring departments
-
-Return ONLY the JSON object, no markdown, no explanation.`;
+  const template = await getAnalysisPrompt();
+  const prompt = template
+    .replace("{{companyName}}", companyName)
+    .replace("{{transcriptText}}", transcriptText)
+    .replace("{{departmentsList}}", departmentsList);
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",

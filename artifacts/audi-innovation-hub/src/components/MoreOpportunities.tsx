@@ -200,7 +200,7 @@ function EventCard({
         </div>
         {event.highlight && (
           <span
-            className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm flex-shrink-0"
+            className="featured-badge px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm flex-shrink-0"
             style={{ background: `${AUDI_RED}22`, color: AUDI_RED, border: `1px solid ${AUDI_RED}44` }}
           >
             Featured
@@ -349,8 +349,8 @@ export default function MoreOpportunities() {
           </p>
           <a
             href="mailto:startup@audi.de?subject=Newsletter%20%E2%80%94%20Audi%20Innovation%20Hub"
-            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
-            style={{ background: AUDI_RED }}
+            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
+            style={{ background: AUDI_RED, color: "#ffffff" }}
           >
             Subscribe to updates
           </a>

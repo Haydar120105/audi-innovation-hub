@@ -2,9 +2,11 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn, useUser, useAuth } from "@clerk/clerk-react";
+import { ThemeProvider } from "next-themes";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import Home from "@/pages/Home";
 import Apply from "@/pages/Apply";
 import { ApplicationsList, ApplicationDetail } from "@/pages/Applications";
@@ -14,6 +16,7 @@ import SignInPage from "@/pages/SignIn";
 import SignUpPage from "@/pages/SignUp";
 import AdminDashboard from "@/pages/Admin";
 import ApplicantDashboard from "@/pages/Dashboard";
+import OrgChart from "@/pages/OrgChart";
 import NotFound from "@/pages/not-found";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
@@ -160,6 +163,9 @@ function Router() {
       <Route path="/admin">
         <SuperuserOnly><AdminDashboard /></SuperuserOnly>
       </Route>
+      <Route path="/org">
+        <SuperuserOnly><OrgChart /></SuperuserOnly>
+      </Route>
 
       <Route component={NotFound} />
     </Switch>
@@ -177,13 +183,16 @@ function App() {
     >
       <ApiAuthSetup />
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={base}>
-            <ScrollToTop />
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <TooltipProvider>
+            <WouterRouter base={base}>
+              <ScrollToTop />
+              <Router />
+            </WouterRouter>
+            <ThemeToggle />
+            <Toaster />
+          </TooltipProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );

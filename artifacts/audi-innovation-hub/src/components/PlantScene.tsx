@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "next-themes";
 
 const W = 1000;
 const H = 720;
@@ -408,14 +409,14 @@ const LABEL_LAYOUT: Record<string, {
 function CalloutLabel({
   id, label, color,
   fromX, fromY, viaX, viaY, endX, endY,
-  textAnchor, isActive, delay, onClick,
+  textAnchor, isActive, delay, onClick, isLight,
 }: {
   id: string; label: string; color: string;
   fromX: number; fromY: number;
   viaX: number; viaY: number;
   endX: number; endY: number;
   textAnchor: "start" | "end";
-  isActive: boolean; delay: number;
+  isActive: boolean; delay: number; isLight: boolean;
   onClick: (e: React.MouseEvent<SVGGElement>) => void;
 }) {
   const PILL_H = 18;
@@ -454,14 +455,14 @@ function CalloutLabel({
       {/* Label pill */}
       <rect
         x={pillX} y={pillY} width={PILL_W} height={PILL_H} rx={2}
-        fill={isActive ? color : "rgba(187,10,33,0.12)"}
+        fill={isActive ? color : isLight ? "rgba(187,10,33,0.72)" : "rgba(187,10,33,0.12)"}
         stroke={lineColor} strokeWidth={1}
         strokeOpacity={isActive ? 1 : 0.5}
       />
       <text
         x={textX} y={endY + 4}
         textAnchor={textAnchor}
-        fill={isActive ? "#fff" : "rgba(255,255,255,0.78)"}
+        fill="#fff"
         fontSize="9"
         fontFamily="'Inter', sans-serif"
         letterSpacing="0.08em"
@@ -477,6 +478,9 @@ function CalloutLabel({
 export default function PlantScene() {
   const [activeDept, setActiveDept] = useState<string | null>(null);
   const [, navigate] = useLocation();
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === "light";
+
   const selected = DEPARTMENTS.find(d => d.id === activeDept) ?? null;
 
   // Inner figure-8: down x=1, cross bottom, up x=3, cross top, back to start
@@ -484,22 +488,30 @@ export default function PlantScene() {
 
   return (
     <div className="relative w-full h-full overflow-hidden"
-      style={{ background: "radial-gradient(ellipse at 45% 45%, #1A0D30 0%, #0C0A1E 50%, #0A0808 100%)" }}
+      style={{ background: isLight
+        ? "linear-gradient(180deg, #C4D5E2 0%, #D9E5EE 45%, #EAF0F5 100%)"
+        : "radial-gradient(ellipse at 45% 45%, #1A0D30 0%, #0C0A1E 50%, #0A0808 100%)" }}
       onClick={() => setActiveDept(null)}
     >
       {/* Grid */}
-      <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{
-        backgroundImage: "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)",
-        backgroundSize: "48px 48px"
-      }} />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          opacity: isLight ? 0.08 : 0.02,
+          backgroundImage: isLight
+            ? "linear-gradient(rgba(30,40,60,1) 1px, transparent 1px), linear-gradient(90deg, rgba(30,40,60,1) 1px, transparent 1px)"
+            : "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)",
+          backgroundSize: "48px 48px"
+        }}
+      />
 
       {/* Audi logo */}
-      <div className="absolute top-7 left-7 z-20">
+      <div className="absolute top-5 left-7 z-20">
         <motion.img
           src="/audi-logo.png"
           alt="Audi"
           width={110}
-          style={{ opacity: 0.92, filter: "brightness(0) invert(1)" }}
+          style={{ opacity: 0.92, filter: isLight ? "brightness(0)" : "brightness(0) invert(1)" }}
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 0.92, y: 0 }}
           transition={{ duration: 0.9, ease: "easeOut" }}
@@ -507,7 +519,11 @@ export default function PlantScene() {
       </div>
 
       {/* Hero headline */}
-      <div className="absolute top-8 left-0 right-0 text-center pointer-events-none z-10 px-8">
+      <motion.div
+        className="absolute top-8 left-0 right-0 text-center pointer-events-none z-10 px-8"
+        animate={{ opacity: activeDept ? 0 : 1 }}
+        transition={{ duration: 0.18 }}
+      >
         <motion.p
           initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.9 }}
@@ -519,17 +535,17 @@ export default function PlantScene() {
         <motion.h1
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.85, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-          className="text-white text-4xl md:text-5xl lg:text-7xl font-light leading-[1.1] tracking-tight"
+          className={`${isLight ? "text-slate-800" : "text-white"} text-4xl md:text-5xl lg:text-7xl font-light leading-[1.1] tracking-tight`}
         >
           The <span className="italic font-light">future</span> is <span className="font-semibold">built together.</span>
         </motion.h1>
-      </div>
+      </motion.div>
 
       {/* SVG scene */}
       <svg width="100%" height="100%" viewBox={`0 -55 ${W} ${H}`} preserveAspectRatio="xMidYMid slice">
         <defs>
           <filter id="bldShadow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="2" dy="8" stdDeviation="10" floodColor="#000" floodOpacity="0.75" />
+            <feDropShadow dx="2" dy="8" stdDeviation="10" floodColor="#000" floodOpacity={isLight ? 0.12 : 0.75} />
           </filter>
           <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
             <feGaussianBlur stdDeviation="6" result="blur" />
@@ -544,8 +560,8 @@ export default function PlantScene() {
             <stop offset="100%" stopColor="#0A4ABB" stopOpacity="0" />
           </radialGradient>
           <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#121128" />
-            <stop offset="100%" stopColor="#0C0B1A" />
+            <stop offset="0%" stopColor={isLight ? "#CDD8E0" : "#121128"} />
+            <stop offset="100%" stopColor={isLight ? "#C0CDD6" : "#0C0B1A"} />
           </linearGradient>
         </defs>
 
@@ -563,7 +579,7 @@ export default function PlantScene() {
           [[0.85, -1], [1.15, -1], [1.15, 4], [0.85, 4]],
           [[2.85, -1], [3.15, -1], [3.15, 4], [2.85, 4]],
         ] as [number, number][][]).map((pts, i) => (
-          <polygon key={i} fill="#161528"
+          <polygon key={i} fill={isLight ? "#B4C4CE" : "#161528"}
             points={pts.map(([px, py]) => `${isoX(px, py)},${isoY(px, py, 0.02)}`).join(" ")} />
         ))}
 
@@ -697,6 +713,7 @@ export default function PlantScene() {
               textAnchor={layout.textAnchor}
               isActive={activeDept === id}
               delay={1.2 + i * 0.1}
+              isLight={isLight}
               onClick={(e) => { e.stopPropagation(); setActiveDept(id === activeDept ? null : id); }}
             />
           );
@@ -754,7 +771,9 @@ export default function PlantScene() {
 
       {/* Bottom vignette */}
       <div className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
-        style={{ background: "linear-gradient(to top, #0A0A14 0%, transparent 100%)" }} />
+        style={{ background: isLight
+          ? "linear-gradient(to top, #EAF0F5 0%, transparent 100%)"
+          : "linear-gradient(to top, #0A0A14 0%, transparent 100%)" }} />
     </div>
   );
 }

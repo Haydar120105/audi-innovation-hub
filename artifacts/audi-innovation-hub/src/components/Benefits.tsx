@@ -178,8 +178,8 @@ export default function Benefits() {
               <motion.div {...up(0.24)}>
                 <Link href="/apply">
                   <span
-                    className="inline-flex items-center gap-3 px-7 py-3.5 text-sm font-semibold tracking-wide text-white transition-opacity hover:opacity-85 cursor-pointer"
-                    style={{ background: "#BB0A21", borderRadius: 2 }}
+                    className="inline-flex items-center gap-3 px-7 py-3.5 text-sm font-semibold tracking-wide transition-opacity hover:opacity-85 cursor-pointer"
+                    style={{ background: "#BB0A21", borderRadius: 2, color: "#ffffff" }}
                   >
                     Apply now
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

@@ -27,7 +27,7 @@ src/
 └── routes/
     ├── index.ts                   ← Mountet alle Router unter /api
     ├── health.ts                  ← GET /healthz
-    ├── chat.ts                    ← POST /chat (Chatbot, Claude Tool Use)
+    ├── chat.ts                    ← POST /chat (Chatbot, Zwei-Call-Muster)
     ├── extract-pdf.ts             ← POST /extract-pdf (multer + Claude)
     ├── applications/
     │   ├── index.ts               ← CRUD für /applications
@@ -50,15 +50,15 @@ src/
 | Method | Pfad | Beschreibung |
 |--------|------|-------------|
 | POST | `/api/applications` | Bewerbung einreichen → speichern → KI-Analyse → Status `routed` |
-| GET | `/api/applications` | Staff: alle; Bewerber: nur eigene (gefiltert nach `clerkUserId`) |
-| GET | `/api/applications/:id` | Detail (Owner oder Staff; 403 sonst) |
-| POST | `/api/chat` | Chatbot-Konversation (Claude Tool Use) |
+| GET | `/api/applications` | Superuser: alle; Staff: nur zugewiesene; Bewerber: nur eigene |
+| GET | `/api/applications/:id` | Superuser: immer; Staff: nur wenn zugewiesen; Owner: eigene |
+| POST | `/api/chat` | Chatbot-Konversation (Zwei-Call: Extraktion + Reply) |
 | POST | `/api/extract-pdf` | PDF → Claude → extrahierte Felder |
 
 ### requireAudiStaff (role = audi_staff oder superuser)
 | Method | Pfad | Beschreibung |
 |--------|------|-------------|
-| PATCH | `/api/applications/:id` | Status, Notes, Rating, NextStep, Requirements, Milestones, KPIs |
+| PATCH | `/api/applications/:id` | Status, Notes, Rating, NextStep, Requirements, Milestones, KPIs, AssignedEmployee, NdaStatus |
 
 ### requireSuperuser (role = superuser only)
 | Method | Pfad | Beschreibung |
@@ -75,7 +75,7 @@ src/
 CLERK_ENABLED  // false wenn Keys fehlen/REPLACE_ME → alle Middleware sind No-Ops
 
 requireAuth         // 401 wenn kein userId
-requireAudiStaff    // 403 wenn role !== 'audi_staff' (superuser kommt durch, da separate Prüfung)
+requireAudiStaff    // 403 wenn role !== 'audi_staff' und !== 'superuser'
 requireSuperuser    // 403 wenn role !== 'superuser'
 
 getUserId(req)      // → string | null  (Clerk userId)
@@ -85,7 +85,12 @@ isSuperuser(req)    // → boolean
 
 **Rolle liegt in:** `sessionClaims.publicMetadata.role` → gesetzt über Clerk-Dashboard oder `/admin`-Endpoint.
 
-**Achtung:** `requireAudiStaff` lässt Superuser NICHT automatisch durch — Frontend prüft das selbst. Für Staff-Endpoints im Backend prüfe beide: `isAudiStaff(req) || isSuperuser(req)`.
+**Rollen direkt per Clerk API prüfen** (statt JWT-Claims) wenn aktuelle Metadaten gebraucht werden:
+```typescript
+const { createClerkClient } = await import("@clerk/express");
+const clerkUser = await createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] }).users.getUser(userId);
+const role = clerkUser.publicMetadata?.["role"] as string | undefined;
+```
 
 ---
 
@@ -104,18 +109,28 @@ Bei KI-Fehler: res.status(201).json(app)  ← Bewerbung bleibt mit status='pendi
 
 ---
 
-## POST /api/chat — Datenfluss
+## POST /api/chat — Zwei-Call-Muster
 
 ```
 Body: { messages: [{role,content}][], collectedFields: {} }
 
-1. System-Prompt: listet fehlende vs. gesammelte Pflichtfelder auf
-2. Claude-Call mit Tool: save_startup_info { companyName, problem, solution, ... }
-3. Wenn Claude nur Tool aufruft (kein Text): Follow-Up-Call für menschliche Antwort
-4. Response: { reply: string, extractedFields: {} }
+── CALL 1: Extraktion ──────────────────────────────────────────────
+system: "Du bist ein Daten-Extraktor. Rufe save_startup_info auf..."
+tool_choice: { type: "any" }        ← zwingt Claude zum Tool-Call
+→ extractedFields: nur neu extrahierte Felder aus diesem Turn
+
+── CALL 2: Konversations-Antwort ───────────────────────────────────
+mergedFields = { ...collectedFields, ...extractedFields }
+system: buildReplyPrompt(mergedFields)   ← kennt exakten Stand NACH Extraktion
+tool_choice: keins                       ← nur Text, kein Tool-Overhead
+→ replyText: 2–3 Sätze, führt Konversation weiter
+
+Response: { reply: string, extractedFields: {}, currentField: string|null }
 ```
 
-**Pflichtfelder:** `companyName`, `problem`, `solution`, `technology`, `stage`, `teamSize`, `targetDepartments`
+**`currentField`** = erster noch-fehlender Pflichtfeld-Name — steuert welche Quick-Reply-Chips das Frontend anzeigt.
+
+**Pflichtfelder (in Reihenfolge):** `companyName`, `problem`, `solution`, `technology`, `stage`, `teamSize`, `targetDepartments`
 
 ---
 
@@ -151,17 +166,37 @@ Nur die **Top-2** Abteilungen erhalten einen Business Case Brief.
 
 ---
 
+## GET /api/applications — Sichtbarkeits-Logik
+
+```typescript
+if (role === "superuser") → alle Bewerbungen
+if (role === "audi_staff") → nur WHERE assignedEmployee->>'clerkId' = userId
+else (Bewerber) → nur WHERE clerkUserId = userId
+```
+
+JSONB-Query in Drizzle:
+```typescript
+import { sql } from "drizzle-orm";
+.where(sql`${applicationsTable.assignedEmployee}->>'clerkId' = ${userId}`)
+```
+
+---
+
 ## PATCH /api/applications/:id — Akzeptierte Felder
 
 ```typescript
-status:       'pending'|'routed'|'shortlisted'|'accepted'|'declined'|'archived'
-notes:        string
-rating:       number (1–5) | null
-nextStep:     string
-requirements: [{ id: string, text: string, done: boolean }]
-milestones:   [{ id: string, title: string, dueDate?: string, status: 'pending'|'in_progress'|'done' }]
-kpis:         [{ id: string, metric: string, target: string, current: string, unit?: string }]
+status:           'pending'|'routed'|'shortlisted'|'accepted'|'declined'|'archived'
+notes:            string
+rating:           number (1–5) | null
+nextStep:         string
+requirements:     [{ id: string, text: string, done: boolean }]
+milestones:       [{ id: string, title: string, dueDate?: string, status: 'pending'|'in_progress'|'done' }]
+kpis:             [{ id: string, metric: string, target: string, current: string, unit?: string }]
+assignedEmployee: { name: string, role: string, email: string, department: string, clerkId: string }
+ndaStatus:        'pending_signature' | 'signed'
 ```
+
+**Berechtigungen:** `audi_staff` darf nur Bewerbungen patchen, die ihm zugewiesen sind (`assignedEmployee.clerkId === patcherId`). Superuser darf alles.
 
 Alle Felder optional — nur gesetzte werden im UPDATE übernommen.
 
@@ -183,7 +218,8 @@ DEPARTMENT_WRITE_SECRET=...   # Legacy, nicht mehr genutzt
 
 ## Typische Fehlerquellen
 
-- **`clerkClient()` als Funktion:** `await clerkClient()` → dann `.users.getUser(id)` etc.
+- **`createClerkClient` als Fabrik aufrufen:** `createClerkClient({ secretKey })` — gibt Instanz zurück, dann `.users.getUser(id)`
 - **JSONB-Casts:** Drizzle gibt JSONB als `unknown` — immer nach dem Lesen casten
 - **Backend neu starten vergessen** nach Code-Änderung (kein HMR)
-- **requireAudiStaff lässt Superuser nicht durch** — wenn ein Endpoint für beide gilt: eigene Prüfung schreiben oder beide Middlewares prüfen
+- **`requireAudiStaff` lässt Superuser durch** (geprüft via Clerk API), aber zusätzliche Ownership-Checks laufen danach nochmal
+- **Zwei-Call-Chat:** Call 1 extrahiert, Call 2 antwortet — nie beides in einem Call, da Text mit staler Feldliste generiert würde

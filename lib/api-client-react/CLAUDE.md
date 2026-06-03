@@ -92,6 +92,7 @@ Der Custom-Fetch wird von Orval als HTTP-Client konfiguriert. Clerk-JWT wird per
 interface RequirementItem { id: string; text: string; done: boolean; }
 interface MilestoneItem   { id: string; title: string; dueDate?: string; status: 'pending'|'in_progress'|'done'; }
 interface KpiItem         { id: string; metric: string; target: string; current: string; unit?: string; }
+interface AssignedEmployee { name: string; role: string; email: string; department: string; clerkId: string; }
 
 // Application (erweitert um Staff-Felder):
 interface Application {
@@ -101,6 +102,8 @@ interface Application {
   requirements?: RequirementItem[];
   milestones?: MilestoneItem[];
   kpis?: KpiItem[];
+  assignedEmployee?: AssignedEmployee | null;
+  ndaStatus?: string | null;
 }
 
 // ApplicationUpdateInput (erweitert):
@@ -112,6 +115,8 @@ interface ApplicationUpdateInput {
   requirements?: RequirementItem[];
   milestones?: MilestoneItem[];
   kpis?: KpiItem[];
+  assignedEmployee?: AssignedEmployee;
+  ndaStatus?: string;
 }
 ```
 

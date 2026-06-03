@@ -4,10 +4,12 @@ import applicationsRouter from "./applications";
 import chatRouter from "./chat";
 import extractPdfRouter from "./extract-pdf";
 import adminRouter from "./admin";
+import configRouter from "./config";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(configRouter);        // public — must be before auth-guarded routes
 router.use(applicationsRouter);
 router.use(chatRouter);
 router.use(extractPdfRouter);

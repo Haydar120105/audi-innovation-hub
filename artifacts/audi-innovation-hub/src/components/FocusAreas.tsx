@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 
@@ -65,7 +66,28 @@ const cardVariants = {
   }),
 };
 
+interface FocusArea {
+  title: string;
+  topics: string[];
+  isWildcard?: boolean;
+}
+
 export default function FocusAreas() {
+  const [areas, setAreas] = useState<FocusArea[]>(FOCUS_AREAS);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data: { focusAreas?: FocusArea[] }) => {
+        if (Array.isArray(data?.focusAreas) && data.focusAreas.length > 0) {
+          setAreas(data.focusAreas);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to hardcoded defaults — network error or backend unavailable
+      });
+  }, []);
+
   return (
     <section className="w-full bg-[#0A0A14] border-t border-white/5 px-6 md:px-12 lg:px-20 py-16">
       <motion.div
@@ -83,12 +105,12 @@ export default function FocusAreas() {
         </h2>
         <div className="w-10 h-[2px] bg-[#BB0A21] mt-5" />
         <p className="text-white/40 text-sm mt-5 leading-relaxed max-w-xl">
-          12 areas where we actively seek startup collaboration to drive technology-led innovation across the Audi value chain.
+          {areas.length} areas where we actively seek startup collaboration to drive technology-led innovation across the Audi value chain.
         </p>
       </motion.div>
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {FOCUS_AREAS.map((area, idx) => (
+        {areas.map((area, idx) => (
           <motion.div
             key={idx}
             custom={idx}

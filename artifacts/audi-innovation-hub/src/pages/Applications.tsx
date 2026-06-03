@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link, useParams } from "wouter";
-import { useAuth } from "@clerk/clerk-react";
-import { UserButton } from "@clerk/clerk-react";
+import { useAuth, useUser, UserButton } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListApplications,
@@ -18,18 +17,27 @@ import type {
   MilestoneItem,
   KpiItem,
 } from "@workspace/api-client-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 const AUDI_RED = "#BB0A21";
 
+const DEPARTMENTS: Record<string, string> = {
+  production: "Production & Manufacturing",
+  rd:         "Research & Development",
+  design:     "Design Studio",
+  logistics:  "Logistics & Supply Chain",
+  sales:      "Sales & Customer Experience",
+  digital:    "Digital & IT",
+};
+
 // ─── Status helpers ───────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:     { label: "Pending",     color: "#d97706", bg: "rgba(217,119,6,0.12)"   },
-  routed:      { label: "Analysed",    color: "#3b82f6", bg: "rgba(59,130,246,0.12)"  },
-  shortlisted: { label: "Shortlisted", color: "#8b5cf6", bg: "rgba(139,92,246,0.12)"  },
-  accepted:    { label: "Accepted",    color: "#16a34a", bg: "rgba(22,163,74,0.12)"   },
-  declined:    { label: "Declined",    color: "#6b7280", bg: "rgba(107,114,128,0.12)" },
-  archived:    { label: "Archived",    color: "#6b7280", bg: "rgba(107,114,128,0.08)" },
+  pending:  { label: "In Analyse",         color: "#d97706", bg: "rgba(217,119,6,0.12)"   },
+  analyzed: { label: "Analysiert",         color: "#3b82f6", bg: "rgba(59,130,246,0.12)"  },
+  assigned: { label: "Zugewiesen",         color: "#8b5cf6", bg: "rgba(139,92,246,0.12)"  },
+  approved: { label: "Erstkontakt",        color: "#16a34a", bg: "rgba(22,163,74,0.12)"   },
+  declined: { label: "Abgelehnt",          color: "#6b7280", bg: "rgba(107,114,128,0.12)" },
+  archived: { label: "Archiviert",         color: "#6b7280", bg: "rgba(107,114,128,0.08)" },
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -75,29 +83,325 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
+// ─── Review Card ─────────────────────────────────────────────────────────────
+function ReviewCard({ app, deptScore, index }: { app: ApplicationSummary; deptScore: DepartmentScore; index: number }) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    setClaimError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/applications/${app.id}/claim`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const body = await res.json() as { error?: string };
+        setClaimError(body.error ?? "Fehler beim Übernehmen");
+        return;
+      }
+      qc.invalidateQueries({ queryKey: getListApplicationsQueryKey() });
+    } catch {
+      setClaimError("Netzwerkfehler");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06, duration: 0.35 }}
+      className="flex items-center gap-5 px-5 py-4 rounded-sm"
+      style={{
+        background: "rgba(187,10,33,0.04)",
+        border: "1px solid rgba(187,10,33,0.2)",
+        borderLeft: `3px solid ${AUDI_RED}`,
+      }}
+    >
+      {/* Company info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-white font-semibold text-sm truncate">{app.companyName}</p>
+        {app.website && (
+          <p className="text-white/30 text-xs truncate mt-0.5">{app.website.replace(/^https?:\/\//, "")}</p>
+        )}
+        {deptScore.justification && (
+          <p className="text-white/40 text-xs mt-1.5 leading-relaxed line-clamp-2">{deptScore.justification}</p>
+        )}
+      </div>
+
+      {/* Score */}
+      <div className="flex-shrink-0 text-center w-16">
+        <p className="text-2xl font-light" style={{ color: AUDI_RED }}>{deptScore.score}</p>
+        <p className="text-white/25 text-[9px] uppercase tracking-wide">/ 100</p>
+        <div className="mt-1 h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+          <div className="h-full rounded-full" style={{ width: `${deptScore.score}%`, background: AUDI_RED }} />
+        </div>
+      </div>
+
+      {/* Status + CTAs */}
+      <div className="flex-shrink-0 flex flex-col items-end gap-2">
+        <StatusBadge status={app.status} />
+        {claimError && (
+          <p className="text-[10px] text-red-400 text-right max-w-[140px] leading-snug">{claimError}</p>
+        )}
+        <button
+          onClick={handleClaim}
+          disabled={claiming}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-sm text-white transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] disabled:opacity-50"
+          style={{ background: AUDI_RED }}
+        >
+          {claiming ? (
+            <div className="w-3 h-3 border-2 rounded-full animate-spin" style={{ borderColor: "white transparent transparent transparent" }} />
+          ) : (
+            <>
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1v5M6 6l3-3M6 6l-3-3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M1 9.5h10" stroke="white" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              Übernehmen
+            </>
+          )}
+        </button>
+        <Link href={`/applications/${app.id}`}>
+          <button
+            className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-opacity duration-150 hover:opacity-70"
+            style={{ color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.12)" }}
+          >
+            Details
+          </button>
+        </Link>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Ambassador Card ──────────────────────────────────────────────────────────
+function AmbassadorCard({
+  app,
+  index,
+  userId,
+}: {
+  app: ApplicationSummary;
+  index: number;
+  userId: string;
+}) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  const { mutate: patch } = useUpdateApplication({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListApplicationsQueryKey() });
+      },
+    },
+  });
+  const [declining, setDeclining] = useState(false);
+  const [contactLoading, setContactLoading] = useState(false);
+
+  const handleApprove = async () => {
+    setContactLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/applications/${app.id}/applicant-contact`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const { email, firstName } = await res.json() as { email: string; firstName: string };
+        const subject = encodeURIComponent(`Erstkontakt — ${app.companyName} × Audi Innovation Hub`);
+        const body = encodeURIComponent(
+          `Hallo${firstName ? ` ${firstName}` : ""},\n\nvielen Dank für deine Bewerbung beim Audi Innovation Hub.\n\nIch bin dein persönlicher Startup Ambassador und freue mich, mit dir in Kontakt zu treten. Lass uns gemeinsam die nächsten Schritte besprechen.\n\nMit freundlichen Grüßen`
+        );
+        window.open(`mailto:${email}?subject=${subject}&body=${body}`, "_blank");
+      }
+    } catch {
+      // Proceed anyway — contact might not have a linked account
+    } finally {
+      setContactLoading(false);
+    }
+    patch({ id: app.id, data: { status: "approved" } as unknown as Parameters<typeof patch>[0]["data"] });
+  };
+
+  const handleDecline = () => {
+    patch({ id: app.id, data: { status: "declined" } as unknown as Parameters<typeof patch>[0]["data"] });
+    setDeclining(false);
+  };
+
+  const employee = app.assignedEmployee as { name?: string; department?: string } | null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06, duration: 0.35 }}
+      className="flex items-center gap-5 px-5 py-4 rounded-sm"
+      style={{
+        background: "rgba(139,92,246,0.04)",
+        border: "1px solid rgba(139,92,246,0.2)",
+        borderLeft: "3px solid #8b5cf6",
+      }}
+    >
+      {/* Company info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-white font-semibold text-sm truncate">{app.companyName}</p>
+        {app.website && (
+          <p className="text-white/30 text-xs truncate mt-0.5">{app.website.replace(/^https?:\/\//, "")}</p>
+        )}
+        <p className="text-white/40 text-xs mt-1">
+          Du bist als Startup Ambassador zugewiesen
+          {employee?.department ? ` · ${employee.department}` : ""}
+        </p>
+      </div>
+
+      {/* Status */}
+      <StatusBadge status={app.status} />
+
+      {/* Action buttons */}
+      <div className="flex-shrink-0 flex flex-col items-end gap-2">
+        {declining ? (
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-white/40">Wirklich ablehnen?</p>
+            <button
+              onClick={handleDecline}
+              className="px-3 py-1.5 text-xs font-semibold rounded-sm text-white"
+              style={{ background: "#6b7280" }}
+            >
+              Ja, ablehnen
+            </button>
+            <button
+              onClick={() => setDeclining(false)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-sm"
+              style={{ color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDeclining(true)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
+              style={{ color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.12)" }}
+            >
+              Ablehnen
+            </button>
+            <button
+              onClick={handleApprove}
+              disabled={contactLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-sm text-white transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] disabled:opacity-50"
+              style={{ background: "#16a34a" }}
+            >
+              {contactLoading ? (
+                <div className="w-3 h-3 border-2 rounded-full animate-spin" style={{ borderColor: "white transparent transparent transparent" }} />
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M1 8.5c0-1.5 2-2.5 5-2.5s5 1 5 2.5M6 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="white" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              )}
+              Erstkontakt herstellen
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD (ApplicationsList)
 // ═══════════════════════════════════════════════════════════════════════════════
 export function ApplicationsList() {
-  const { data: apps, isLoading, error } = useListApplications();
+  const { data: apps, isLoading, error, refetch } = useListApplications();
+  const { user } = useUser();
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  type SortField = "company" | "stage" | "score" | "rating" | "status" | "date";
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const handleSort = (field: SortField) => {
+    if (sortField === field) { setSortDir(d => d === "asc" ? "desc" : "asc"); }
+    else { setSortField(field); setSortDir("desc"); }
+  };
+
+  // Poll every 30 s so new applications appear without a manual reload
+  useEffect(() => {
+    const id = setInterval(() => { refetch(); }, 30_000);
+    return () => clearInterval(id);
+  }, [refetch]);
+
+  const userRole = (user?.publicMetadata?.role as string | undefined) ?? null;
+  const userDeptId = (user?.publicMetadata?.departmentId as string | undefined) ?? null;
+  const userDeptName = userDeptId ? (DEPARTMENTS[userDeptId] ?? userDeptId) : null;
+  const isStaffView = userRole === "audi_staff";
+
+  // Review queue: dept score ≥ 70, status analyzed, not yet rated
+  const reviewQueue = isStaffView && userDeptId
+    ? (apps ?? []).filter(a => {
+        if (a.status !== "analyzed") return false;
+        if ((a as any).rating) return false;
+        return ((a.departmentScores ?? []) as DepartmentScore[])
+          .some(s => s.departmentId === userDeptId && s.score >= 70);
+      })
+    : [];
+
+  const reviewedCount = isStaffView && userDeptId
+    ? (apps ?? []).filter(a =>
+        (a as any).rating > 0 &&
+        ((a.departmentScores ?? []) as DepartmentScore[]).some(s => s.departmentId === userDeptId && s.score >= 70)
+      ).length
+    : 0;
+
+  const assignedCount = isStaffView
+    ? (apps ?? []).filter(a => (a.assignedEmployee as any)?.clerkId === user?.id).length
+    : 0;
+
+  // Apps assigned to this staff member as ambassador
+  const ambassadorApps = isStaffView
+    ? (apps ?? []).filter(a => (a.assignedEmployee as any)?.clerkId === user?.id && a.status === "assigned")
+    : [];
 
   const stats = {
-    total:       apps?.length ?? 0,
-    pending:     apps?.filter(a => a.status === "pending" || a.status === "routed").length ?? 0,
-    shortlisted: apps?.filter(a => a.status === "shortlisted").length ?? 0,
-    accepted:    apps?.filter(a => a.status === "accepted").length ?? 0,
-    declined:    apps?.filter(a => a.status === "declined").length ?? 0,
+    total:    apps?.length ?? 0,
+    analyzed: apps?.filter(a => a.status === "pending" || a.status === "analyzed").length ?? 0,
+    assigned: apps?.filter(a => a.status === "assigned").length ?? 0,
+    approved: apps?.filter(a => a.status === "approved").length ?? 0,
+    declined: apps?.filter(a => a.status === "declined").length ?? 0,
   };
 
   const filtered = (apps ?? []).filter(a => {
     const matchFilter = filter === "all" || a.status === filter ||
-      (filter === "pending" && (a.status === "pending" || a.status === "routed"));
+      (filter === "analyzed" && (a.status === "pending" || a.status === "analyzed"));
     const matchSearch = !search ||
       a.companyName.toLowerCase().includes(search.toLowerCase()) ||
       (a.stage ?? "").toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
+  });
+
+  const STATUS_ORDER: Record<string, number> = {
+    pending: 0, analyzed: 1, assigned: 2, approved: 3, declined: 4, archived: 5,
+  };
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0;
+    switch (sortField) {
+      case "company": cmp = a.companyName.localeCompare(b.companyName); break;
+      case "stage":   cmp = (a.stage ?? "").localeCompare(b.stage ?? ""); break;
+      case "score": {
+        const aMax = (a.departmentScores?.length ?? 0) > 0
+          ? Math.max(...(a.departmentScores as DepartmentScore[]).map(s => s.score)) : -1;
+        const bMax = (b.departmentScores?.length ?? 0) > 0
+          ? Math.max(...(b.departmentScores as DepartmentScore[]).map(s => s.score)) : -1;
+        cmp = aMax - bMax; break;
+      }
+      case "rating":  cmp = ((a as any).rating ?? 0) - ((b as any).rating ?? 0); break;
+      case "status":  cmp = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99); break;
+      case "date":    cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break;
+    }
+    return sortDir === "asc" ? cmp : -cmp;
   });
 
   return (
@@ -120,42 +424,190 @@ export function ApplicationsList() {
           </span>
         </Link>
         <div className="flex items-center gap-3">
+          {userDeptName && (
+            <span
+              className="px-3 py-1.5 text-xs font-semibold rounded-sm hidden sm:inline-flex items-center gap-1.5"
+              style={{ background: "rgba(187,10,33,0.1)", color: "rgba(187,10,33,0.85)", border: "1px solid rgba(187,10,33,0.25)" }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: AUDI_RED }} />
+              {userDeptName}
+            </span>
+          )}
           <Link href="/departments">
             <button className="px-4 py-2 text-xs font-semibold rounded-sm transition-[background-color,border-color,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
               style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}>
               Departments
             </button>
           </Link>
-          <Link href="/apply">
-            <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
-              style={{ background: AUDI_RED }}>
-              + New Application
-            </button>
-          </Link>
+          {userRole === "superuser" && (
+            <Link href="/admin">
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97]"
+                style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M7.5 2L3 6l4.5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Admin
+              </button>
+            </Link>
+          )}
+          {userRole !== "audi_staff" && userRole !== "superuser" && (
+            <Link href="/apply">
+              <button className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97]"
+                style={{ background: AUDI_RED }}>
+                + New Application
+              </button>
+            </Link>
+          )}
           <UserButton afterSignOutUrl="/" />
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-6 pt-24 pb-20">
-        {/* Header */}
+
+        {/* Notification banner */}
+        <AnimatePresence>
+          {isStaffView && reviewQueue.length > 0 && !bannerDismissed && !isLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35 }}
+              className="mb-6 px-5 py-3.5 rounded-sm flex items-center justify-between gap-4"
+              style={{
+                background: "rgba(187,10,33,0.08)",
+                border: "1px solid rgba(187,10,33,0.3)",
+                boxShadow: "0 0 24px rgba(187,10,33,0.08)",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-base">🔔</span>
+                <p className="text-sm font-semibold" style={{ color: AUDI_RED }}>
+                  {reviewQueue.length} {reviewQueue.length === 1 ? "Bewerbung wartet" : "Bewerbungen warten"} auf deine Einschätzung
+                </p>
+              </div>
+              <button
+                onClick={() => setBannerDismissed(true)}
+                className="text-white/25 hover:text-white/60 transition-colors text-lg leading-none flex-shrink-0"
+              >
+                ×
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Personalized header */}
         <div className="mb-10">
-          <p className="text-xs tracking-[0.25em] font-semibold uppercase mb-2" style={{ color: AUDI_RED }}>
-            Staff Dashboard
-          </p>
-          <h1 className="text-3xl md:text-4xl font-light text-white">
-            Startup <span className="font-semibold">Applications</span>
-          </h1>
-          <p className="text-white/30 text-sm mt-1">Review, rate, and move applications through the pipeline.</p>
+          {isStaffView ? (
+            <>
+              <p className="text-xs tracking-[0.25em] font-semibold uppercase mb-2" style={{ color: AUDI_RED }}>
+                Hallo, {user?.firstName ?? "Staff"} 👋
+              </p>
+              <h1 className="text-3xl md:text-4xl font-light text-white">
+                Mein <span className="font-semibold">Dashboard</span>
+              </h1>
+              {userDeptName && (
+                <div className="flex flex-wrap items-center gap-3 mt-3">
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full"
+                    style={{ background: "rgba(187,10,33,0.1)", color: "rgba(187,10,33,0.85)", border: "1px solid rgba(187,10,33,0.25)" }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: AUDI_RED }} />
+                    {userDeptName}
+                  </span>
+                  {[
+                    { label: "Zur Bewertung", value: reviewQueue.length,    color: AUDI_RED },
+                    { label: "Meine Apps",    value: ambassadorApps.length, color: "#8b5cf6" },
+                    { label: "Bewertet",      value: reviewedCount,         color: "#16a34a" },
+                  ].map(({ label, value, color }) => (
+                    <span key={label} className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
+                      <span className="font-semibold" style={{ color }}>{value}</span> {label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-xs tracking-[0.25em] font-semibold uppercase mb-2" style={{ color: AUDI_RED }}>
+                Staff Dashboard
+              </p>
+              <h1 className="text-3xl md:text-4xl font-light text-white">
+                Startup <span className="font-semibold">Applications</span>
+              </h1>
+              <p className="text-white/30 text-sm mt-1">Review, rate, and move applications through the pipeline.</p>
+            </>
+          )}
         </div>
+
+        {/* Review Queue — staff only */}
+        {isStaffView && !isLoading && reviewQueue.length > 0 && (
+          <div className="mb-10">
+            {/* Section header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: AUDI_RED }} />
+              <p className="text-xs font-semibold tracking-[0.18em] uppercase" style={{ color: "rgba(255,255,255,0.5)" }}>
+                Zur Bewertung ausstehend
+              </p>
+              <span
+                className="px-2 py-0.5 text-[10px] font-bold rounded-full"
+                style={{ background: AUDI_RED, color: "#fff" }}
+              >
+                {reviewQueue.length}
+              </span>
+              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+            </div>
+
+            <div className="space-y-3">
+              {reviewQueue.map((app, i) => {
+                const deptScore = ((app.departmentScores ?? []) as DepartmentScore[])
+                  .find(s => s.departmentId === userDeptId)!;
+                return <ReviewCard key={app.id} app={app} deptScore={deptScore} index={i} />;
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Ambassador section — apps where this staff is the assigned ambassador */}
+        {isStaffView && !isLoading && ambassadorApps.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#8b5cf6" }} />
+              <p className="text-xs font-semibold tracking-[0.18em] uppercase" style={{ color: "rgba(255,255,255,0.5)" }}>
+                Meine zugewiesenen Bewerbungen
+              </p>
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full" style={{ background: "#8b5cf6", color: "#fff" }}>
+                {ambassadorApps.length}
+              </span>
+              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+            </div>
+            <div className="space-y-3">
+              {ambassadorApps.map((app, i) => (
+                <AmbassadorCard key={app.id} app={app} index={i} userId={user?.id ?? ""} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section divider for staff */}
+        {isStaffView && !isLoading && (
+          <div className="flex items-center gap-3 mb-6">
+            <p className="text-xs font-semibold tracking-[0.18em] uppercase" style={{ color: "rgba(255,255,255,0.2)" }}>
+              Alle Bewerbungen
+            </p>
+            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+          </div>
+        )}
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
           {[
-            { label: "Total",       value: stats.total,       filter: "all",         color: "rgba(255,255,255,0.6)" },
-            { label: "Pending",     value: stats.pending,     filter: "pending",     color: "#d97706"  },
-            { label: "Shortlisted", value: stats.shortlisted, filter: "shortlisted", color: "#8b5cf6"  },
-            { label: "Accepted",    value: stats.accepted,    filter: "accepted",    color: "#16a34a"  },
-            { label: "Declined",    value: stats.declined,    filter: "declined",    color: "#6b7280"  },
+            { label: "Total",      value: stats.total,    filter: "all",      color: "rgba(255,255,255,0.6)" },
+            { label: "Analyse",    value: stats.analyzed, filter: "analyzed", color: "#d97706"  },
+            { label: "Zugewiesen", value: stats.assigned, filter: "assigned", color: "#8b5cf6"  },
+            { label: "Erstkontakt",value: stats.approved, filter: "approved", color: "#16a34a"  },
+            { label: "Abgelehnt",  value: stats.declined, filter: "declined", color: "#6b7280"  },
           ].map(({ label, value, filter: f, color }) => (
             <button
               key={f}
@@ -185,7 +637,7 @@ export function ApplicationsList() {
             }}
           />
           <div className="flex gap-2 flex-wrap">
-            {["all", "pending", "shortlisted", "accepted", "declined", "archived"].map(s => (
+            {["all", "analyzed", "assigned", "approved", "declined", "archived"].map(s => (
               <button
                 key={s}
                 onClick={() => setFilter(s)}
@@ -219,7 +671,7 @@ export function ApplicationsList() {
         )}
 
         {/* Empty */}
-        {!isLoading && !error && filtered.length === 0 && (
+        {!isLoading && !error && sorted.length === 0 && (
           <div className="text-center py-20">
             {search ? (
               <p className="text-white/25 text-sm">No applications match your search.</p>
@@ -247,22 +699,46 @@ export function ApplicationsList() {
         )}
 
         {/* Table */}
-        {filtered.length > 0 && (
+        {sorted.length > 0 && (
           <div className="rounded-sm overflow-hidden"
             style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
             {/* Header row */}
-            <div className="grid grid-cols-12 gap-4 px-5 py-3 text-xs font-semibold tracking-[0.12em] uppercase text-white/25"
+            <div className="grid grid-cols-12 gap-4 px-5 py-3"
               style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              <span className="col-span-4">Company</span>
-              <span className="col-span-2 hidden md:block">Stage</span>
-              <span className="col-span-2 hidden md:block">Top Score</span>
-              <span className="col-span-1">Rating</span>
-              <span className="col-span-2">Status</span>
-              <span className="col-span-1 text-right">Date</span>
+              {(
+                [
+                  { field: "company" as const, label: "Company",   col: "col-span-4",             hidden: false },
+                  { field: "stage"   as const, label: "Stage",     col: "col-span-2 hidden md:block", hidden: true },
+                  { field: "score"   as const, label: "Top Score", col: "col-span-2 hidden md:block", hidden: true },
+                  { field: "rating"  as const, label: "Rating",    col: "col-span-1",             hidden: false },
+                  { field: "status"  as const, label: "Status",    col: "col-span-2",             hidden: false },
+                  { field: "date"    as const, label: "Date",      col: "col-span-1",             hidden: false, right: true },
+                ] as { field: SortField; label: string; col: string; hidden?: boolean; right?: boolean }[]
+              ).map(({ field, label, col, right }) => {
+                const active = sortField === field;
+                return (
+                  <button
+                    key={field}
+                    onClick={() => handleSort(field)}
+                    className={`${col} flex items-center gap-1 text-xs font-semibold tracking-[0.12em] uppercase transition-colors duration-150 select-none ${right ? "justify-end" : ""}`}
+                    style={{ color: active ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)" }}
+                  >
+                    {label}
+                    <span className="flex flex-col gap-[1px] ml-0.5" style={{ opacity: active ? 1 : 0.3 }}>
+                      <svg width="6" height="4" viewBox="0 0 6 4" fill="none" style={{ opacity: active && sortDir === "asc" ? 1 : 0.4 }}>
+                        <path d="M3 0L6 4H0L3 0Z" fill="currentColor" />
+                      </svg>
+                      <svg width="6" height="4" viewBox="0 0 6 4" fill="none" style={{ opacity: active && sortDir === "desc" ? 1 : 0.4 }}>
+                        <path d="M3 4L0 0H6L3 4Z" fill="currentColor" />
+                      </svg>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {/* Rows */}
-            {filtered.map((app, i) => (
-              <AppRow key={app.id} app={app} odd={i % 2 === 1} />
+            {sorted.map((app, i) => (
+              <AppRow key={app.id} app={app} odd={i % 2 === 1} userDeptId={userDeptId} />
             ))}
           </div>
         )}
@@ -271,10 +747,11 @@ export function ApplicationsList() {
   );
 }
 
-function AppRow({ app, odd }: { app: ApplicationSummary; odd: boolean }) {
+function AppRow({ app, odd, userDeptId }: { app: ApplicationSummary; odd: boolean; userDeptId?: string | null }) {
   const scores = (app.departmentScores ?? []) as DepartmentScore[];
+  const myDeptScore = userDeptId ? scores.find(s => s.departmentId === userDeptId) : null;
   const topScore = scores.length > 0 ? Math.max(...scores.map(s => s.score)) : null;
-  const topDept = topScore != null ? scores.find(s => s.score === topScore) : null;
+  const topDept = myDeptScore ?? (topScore != null ? scores.find(s => s.score === topScore) : null);
 
   return (
     <Link href={`/applications/${app.id}`}>
@@ -503,7 +980,7 @@ export function ApplicationDetail() {
 
         {/* Staff / superuser actions panel */}
         {isStaff && (
-          <StaffPanel app={app} onSave={save} isSuperuser={isSuperuser} />
+          <StaffPanel app={app} onSave={save} isSuperuser={isSuperuser} appId={app.id} companyName={app.companyName} />
         )}
 
         {!structured && cases.length === 0 && scores.length === 0 && (
@@ -555,10 +1032,10 @@ function CopyButton({ text }: { text: string }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Pipeline steps shared between superuser stepper and status select
 const PIPELINE_STEPS = [
-  { status: "pending",     label: "Pending",     color: "#d97706" },
-  { status: "routed",      label: "Analysed",    color: "#3b82f6" },
-  { status: "shortlisted", label: "Shortlisted", color: "#8b5cf6" },
-  { status: "accepted",    label: "Accepted",    color: "#16a34a" },
+  { status: "pending",  label: "Eingereicht", color: "#d97706" },
+  { status: "analyzed", label: "Analysiert",  color: "#3b82f6" },
+  { status: "assigned", label: "Zugewiesen",  color: "#8b5cf6" },
+  { status: "approved", label: "Erstkontakt", color: "#16a34a" },
 ];
 
 interface StaffUserLite {
@@ -567,16 +1044,21 @@ interface StaffUserLite {
   lastName: string;
   email: string;
   imageUrl: string;
+  departmentId?: string | null;
 }
 
 function StaffPanel({
   app,
   onSave,
   isSuperuser = false,
+  appId,
+  companyName,
 }: {
   app: { status: string; rating?: number | null; notes?: string | null; nextStep?: string | null; requirements?: RequirementItem[] | null; milestones?: MilestoneItem[] | null; kpis?: KpiItem[] | null; assignedEmployee?: { name: string; role: string; email: string; department: string; clerkId?: string } | null; ndaStatus?: string | null };
   onSave: (data: Record<string, unknown>) => void;
   isSuperuser?: boolean;
+  appId?: string;
+  companyName?: string;
 }) {
   const { getToken } = useAuth();
 
@@ -588,6 +1070,13 @@ function StaffPanel({
   const [milestones, setMilestones] = useState<MilestoneItem[]>(app.milestones ?? []);
   const [kpis, setKpis] = useState<KpiItem[]>(app.kpis ?? []);
   const [saved, setSaved] = useState(false);
+
+  // Meeting feature state
+  const [meetingOpen, setMeetingOpen] = useState(false);
+  const [meetingDate, setMeetingDate] = useState("");
+  const [meetingContactLoading, setMeetingContactLoading] = useState(false);
+  const [meetingContact, setMeetingContact] = useState<{ email: string; firstName: string } | null>(null);
+  const [meetingContactError, setMeetingContactError] = useState(false);
 
   // Onboarding / assignment fields
   const [empName, setEmpName] = useState(app.assignedEmployee?.name ?? "");
@@ -628,6 +1117,46 @@ function StaffPanel({
 
   const triggerSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
 
+  const handleOpenMeeting = async () => {
+    setMeetingOpen(true);
+    if (meetingContact || !appId) return;
+    setMeetingContactLoading(true);
+    setMeetingContactError(false);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/applications/${appId}/applicant-contact`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("not found");
+      const data = await res.json();
+      setMeetingContact(data);
+    } catch {
+      setMeetingContactError(true);
+    } finally {
+      setMeetingContactLoading(false);
+    }
+  };
+
+  const handleConfirmMeeting = () => {
+    const formatted = meetingDate
+      ? new Date(meetingDate).toLocaleString("de-DE", { dateStyle: "full", timeStyle: "short" })
+      : "";
+    if (formatted) {
+      const newNextStep = `Meeting vorgeschlagen: ${formatted}`;
+      setNextStep(newNextStep);
+      onSave({ nextStep: newNextStep });
+      triggerSaved();
+    }
+    if (meetingContact?.email && meetingDate) {
+      const subject = encodeURIComponent(`Meeting — ${companyName ?? "Innovation Hub"}`);
+      const body = encodeURIComponent(
+        `Hallo${meetingContact.firstName ? ` ${meetingContact.firstName}` : ""},\n\nwir würden uns gerne mit Ihnen zu einem Meeting treffen.\n\nVorgeschlagener Termin: ${formatted}\n\nMit freundlichen Grüßen\nAudi Innovation Hub`
+      );
+      window.open(`mailto:${meetingContact.email}?subject=${subject}&body=${body}`, "_blank");
+    }
+    setMeetingOpen(false);
+  };
+
   const handleAdvance = () => {
     if (!nextPipelineStep) return;
     const newStatus = nextPipelineStep.status;
@@ -639,16 +1168,22 @@ function StaffPanel({
   const handlePickStaff = (userId: string) => {
     setPickedStaffId(userId);
     const user = staffUsers.find(u => u.id === userId);
-    if (!user) { setEmpName(""); setEmpEmail(""); return; }
+    if (!user) { setEmpName(""); setEmpEmail(""); setEmpDept(""); return; }
     setEmpName(`${user.firstName} ${user.lastName}`.trim() || user.email);
     setEmpEmail(user.email);
+    // Auto-fill department from the staff member's persistent Clerk departmentId
+    setEmpDept(user.departmentId ? (DEPARTMENTS[user.departmentId] ?? user.departmentId) : "");
   };
 
   const handleSave = () => {
     const assignedEmployee = empName && empRole && empEmail && empDept
       ? { name: empName, role: empRole, email: empEmail, department: empDept, clerkId: pickedStaffId || undefined }
       : null;
-    onSave({ status, rating: rating || null, notes, nextStep, requirements: reqs, milestones, kpis, assignedEmployee, ndaStatus: ndaStatus || null });
+    // Auto-advance: when superuser sets an ambassador on an 'analyzed' app, move to 'assigned'
+    const effectiveStatus = (assignedEmployee && app.status === "analyzed" && status === "analyzed")
+      ? "assigned"
+      : status;
+    onSave({ status: effectiveStatus, rating: rating || null, notes, nextStep, requirements: reqs, milestones, kpis, assignedEmployee, ndaStatus: ndaStatus || null });
     triggerSaved();
   };
 
@@ -683,14 +1218,93 @@ function StaffPanel({
           <p className="text-xs tracking-[0.25em] font-semibold uppercase" style={{ color: AUDI_RED }}>Staff Actions</p>
           <p className="text-white/30 text-xs mt-0.5">Internal assessment — not visible to applicant</p>
         </div>
-        <button
-          onClick={handleSave}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-sm transition-[background-color,transform] duration-200 active:scale-[0.97]"
-          style={{ background: saved ? "#16a34a" : AUDI_RED }}
-        >
-          {saved ? "✓ Saved" : "Save Changes"}
-        </button>
+        <div className="flex items-center gap-2">
+          {appId && (
+            <button
+              onClick={handleOpenMeeting}
+              className="px-4 py-2 text-sm font-semibold rounded-sm transition-[opacity,transform] duration-150 hover:opacity-80 active:scale-[0.97] flex items-center gap-1.5"
+              style={{ background: "rgba(59,130,246,0.12)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.25)" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M4 1v3M10 1v3M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              Meeting einberufen
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            className="px-5 py-2 text-sm font-semibold text-white rounded-sm transition-[background-color,transform] duration-200 active:scale-[0.97]"
+            style={{ background: saved ? "#16a34a" : AUDI_RED }}
+          >
+            {saved ? "✓ Saved" : "Save Changes"}
+          </button>
+        </div>
       </div>
+
+      {/* Meeting modal */}
+      {meetingOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setMeetingOpen(false); }}
+        >
+          <div
+            className="w-full max-w-md rounded-sm overflow-hidden"
+            style={{ background: "#0f0f1e", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <div>
+                <p className="text-[11px] tracking-[0.2em] uppercase font-semibold mb-0.5" style={{ color: "#60a5fa" }}>Meeting einberufen</p>
+                <p className="text-white font-semibold text-sm">{companyName}</p>
+              </div>
+              <button onClick={() => setMeetingOpen(false)} className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors" style={{ color: "rgba(255,255,255,0.4)" }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-white/30 text-xs font-semibold uppercase tracking-wide mb-2">Vorgeschlagener Termin</p>
+                <input
+                  type="datetime-local"
+                  value={meetingDate}
+                  onChange={e => setMeetingDate(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-sm text-sm text-white outline-none"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", colorScheme: "dark" }}
+                />
+              </div>
+              {meetingContactLoading && (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 rounded-full animate-spin flex-shrink-0" style={{ borderColor: "#60a5fa transparent transparent transparent" }} />
+                  <p className="text-white/30 text-xs">Bewerber-Kontakt wird geladen…</p>
+                </div>
+              )}
+              {meetingContactError && (
+                <p className="text-white/30 text-xs">Kein Bewerber-Account mit dieser Bewerbung verknüpft. Datum wird trotzdem als Next Step gespeichert.</p>
+              )}
+              {meetingContact && (
+                <div className="px-3 py-2.5 rounded-sm flex items-center gap-2" style={{ background: "rgba(59,130,246,0.07)", border: "1px solid rgba(59,130,246,0.2)" }}>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 7a3 3 0 100-6 3 3 0 000 6zM1.5 13c0-2.5 2.5-4.5 5.5-4.5s5.5 2 5.5 4.5" stroke="#60a5fa" strokeWidth="1.2" strokeLinecap="round" /></svg>
+                  <p className="text-xs" style={{ color: "#93c5fd" }}>{meetingContact.email}</p>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-4 flex items-center justify-end gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <button onClick={() => setMeetingOpen(false)} className="px-4 py-2 text-xs font-semibold rounded-sm hover:bg-white/10 transition-colors" style={{ color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                Abbrechen
+              </button>
+              <button
+                onClick={handleConfirmMeeting}
+                disabled={!meetingDate}
+                className="px-4 py-2 text-xs font-semibold text-white rounded-sm transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: "#3b82f6" }}
+              >
+                {meetingContact?.email ? "Datum speichern & E-Mail öffnen" : "Datum als Next Step speichern"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Superuser admin controls ── */}
       {isSuperuser && (
@@ -789,7 +1403,7 @@ function StaffPanel({
                     <path d="M2.5 7l3 3 6-6" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <p className="text-xs font-semibold" style={{ color: "#16a34a" }}>
-                    Final stage reached — application is Accepted
+                    Finale Stufe erreicht — Erstkontakt hergestellt
                   </p>
                 </div>
               )}
@@ -890,12 +1504,12 @@ function StaffPanel({
             className="w-full px-3 py-2 rounded-sm text-sm text-white outline-none"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
           >
-            <option value="pending">Pending</option>
-            <option value="routed">Analysed</option>
-            <option value="shortlisted">Shortlisted</option>
-            <option value="accepted">Accepted</option>
-            <option value="declined">Declined</option>
-            <option value="archived">Archived</option>
+            <option value="pending">In Analyse</option>
+            <option value="analyzed">Analysiert</option>
+            <option value="assigned">Zugewiesen</option>
+            <option value="approved">Erstkontakt</option>
+            <option value="declined">Abgelehnt</option>
+            <option value="archived">Archiviert</option>
           </select>
         </div>
 
@@ -918,12 +1532,12 @@ function StaffPanel({
         </div>
       </div>
 
-      {/* Onboarding — only shown when accepted */}
-      {status === "accepted" && (
+      {/* Onboarding — shown when ambassador assigned or first contact made */}
+      {(status === "assigned" || status === "approved") && (
         <div className="rounded-sm overflow-hidden" style={{ border: "1px solid rgba(22,163,74,0.25)", background: "rgba(22,163,74,0.04)" }}>
           <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: "1px solid rgba(22,163,74,0.12)" }}>
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#16a34a" }} />
-            <p className="text-xs font-semibold" style={{ color: "#16a34a" }}>Onboarding Bundle — visible to applicant</p>
+            <p className="text-xs font-semibold" style={{ color: "#16a34a" }}>Ambassador-Onboarding — für Bewerber sichtbar</p>
           </div>
           <div className="p-5 space-y-4">
             {/* NDA Status */}

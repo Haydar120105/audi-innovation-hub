@@ -13,9 +13,9 @@ import { z } from "zod/v4";
 
 export const applicationStatusEnum = pgEnum("application_status", [
   "pending",
-  "routed",
-  "shortlisted",
-  "accepted",
+  "analyzed",
+  "assigned",
+  "approved",
   "declined",
   "archived",
 ]);
@@ -46,6 +46,8 @@ export const applicationsTable = pgTable("applications", {
   // Onboarding fields (set when accepted)
   assignedEmployee: jsonb("assigned_employee"), // { name, role, email, department }
   ndaStatus: text("nda_status"),               // 'pending_signature' | 'signed'
+  // Hackathon invitation
+  hackathonSlot: text("hackathon_slot"),        // e.g. 'jul-2026'
 });
 
 export const insertApplicationSchema = createInsertSchema(applicationsTable).omit({

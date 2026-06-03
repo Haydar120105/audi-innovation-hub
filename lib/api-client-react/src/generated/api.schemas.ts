@@ -40,9 +40,9 @@ export type ApplicationUpdateInputStatus = typeof ApplicationUpdateInputStatus[k
 
 export const ApplicationUpdateInputStatus = {
   pending: 'pending',
-  routed: 'routed',
-  shortlisted: 'shortlisted',
-  accepted: 'accepted',
+  analyzed: 'analyzed',
+  assigned: 'assigned',
+  approved: 'approved',
   declined: 'declined',
   archived: 'archived',
 } as const;
@@ -83,6 +83,7 @@ export interface AssignedEmployee {
   role: string;
   email: string;
   department: string;
+  clerkId?: string;
 }
 
 export interface ApplicationSummary {
@@ -123,6 +124,7 @@ export interface Application {
   kpis?: KpiItem[] | null;
   assignedEmployee?: AssignedEmployee | null;
   ndaStatus?: string | null;
+  hackathonSlot?: string | null;
 }
 
 export interface ApplicationTracking {
@@ -130,6 +132,8 @@ export interface ApplicationTracking {
   status: string;
   createdAt: string;
   departmentScores?: DepartmentScore[];
+  hackathonSlot?: string | null;
+  applicantType?: string | null;
 }
 
 export interface ApiError {
