@@ -506,7 +506,7 @@ export default function PlantScene() {
       />
 
       {/* Audi logo */}
-      <div className="absolute top-5 left-7 z-20">
+      <div className="hidden md:block absolute top-5 left-7 z-20">
         <motion.img
           src="/audi-logo.png"
           alt="Audi"
