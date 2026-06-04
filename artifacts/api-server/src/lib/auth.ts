@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "./logger";
 
 /**
  * True when real Clerk keys are configured.
@@ -60,12 +61,7 @@ async function verifyBearerToken(req: Request): Promise<string | null> {
     return userId;
   } catch (err) {
     const e = err as Error & { code?: string; reason?: string };
-    console.error(
-      "[auth] verifyToken failed — message: %s | code: %s | reason: %s",
-      e.message,
-      e.code ?? "n/a",
-      e.reason ?? "n/a",
-    );
+    logger.error({ code: e.code, reason: e.reason, err: e }, "verifyToken failed");
     return null;
   }
 }

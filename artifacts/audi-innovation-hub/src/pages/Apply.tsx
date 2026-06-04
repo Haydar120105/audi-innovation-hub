@@ -471,6 +471,7 @@ export default function Apply() {
       setDeptSelection([]);
       setIsLoading(true);
 
+      let isAuthError = false;
       try {
         const token = await getToken();
         const res = await fetch("/api/chat", {
@@ -486,10 +487,8 @@ export default function Apply() {
         });
 
         if (!res.ok) {
-          if (res.status === 401) {
-            throw new Error("AUTH_ERROR: session could not be verified");
-          }
-          throw new Error(`SERVER_ERROR: ${res.status}`);
+          isAuthError = res.status === 401;
+          throw new Error(`Chat request failed with status ${res.status}`);
         }
 
         const data = (await res.json()) as {
@@ -511,15 +510,13 @@ export default function Apply() {
         setCurrentField(data.currentField ?? "");
       } catch (err) {
         console.error("[chat] sendMessage failed:", err);
-        const message = (err as Error).message ?? "";
-        const userFacingText = message.startsWith("AUTH_ERROR:")
-          ? "Your session expired — please sign out and sign back in, then try again."
-          : "Something went wrong — please try again or contact startup@audi.de.";
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: userFacingText,
+            content: isAuthError
+              ? "Your session expired — please sign out and sign back in, then try again."
+              : "Something went wrong — please try again or contact startup@audi.de.",
           },
         ]);
       } finally {
@@ -562,6 +559,7 @@ export default function Apply() {
       setMessages((prev) => [...prev, pdfMsg]);
       setIsPdfLoading(true);
 
+      let isPdfAuthError = false;
       try {
         const token = await getToken();
         const formData = new FormData();
@@ -572,7 +570,10 @@ export default function Apply() {
           body: formData,
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        if (!res.ok) throw new Error("PDF extraction failed");
+        if (!res.ok) {
+          isPdfAuthError = res.status === 401;
+          throw new Error(`PDF extraction failed with status ${res.status}`);
+        }
 
         const data = (await res.json()) as {
           extracted: Record<string, unknown>;
@@ -613,13 +614,15 @@ export default function Apply() {
         // Update current field so chips reflect what's being asked next
         if (data.missing.length > 0) setCurrentField(data.missing[0]);
         else setCurrentField("");
-      } catch {
+      } catch (err) {
+        console.error("[pdf] handlePdfUpload failed:", err);
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content:
-              "I couldn't read that PDF — it may be encrypted or image-only. Could you describe your startup instead?",
+            content: isPdfAuthError
+              ? "Your session expired — please sign out and sign back in, then try again."
+              : "I couldn't read that PDF — it may be encrypted or image-only. Could you describe your startup instead?",
           },
         ]);
       } finally {
