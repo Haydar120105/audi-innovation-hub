@@ -59,7 +59,13 @@ async function verifyBearerToken(req: Request): Promise<string | null> {
 
     return userId;
   } catch (err) {
-    console.error("[auth] verifyToken failed:", (err as Error).message);
+    const e = err as Error & { code?: string; reason?: string };
+    console.error(
+      "[auth] verifyToken failed — message: %s | code: %s | reason: %s",
+      e.message,
+      e.code ?? "n/a",
+      e.reason ?? "n/a",
+    );
     return null;
   }
 }

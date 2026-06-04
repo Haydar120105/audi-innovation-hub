@@ -1,4 +1,5 @@
 import { SignIn } from "@clerk/clerk-react";
+import { dark } from "@clerk/themes";
 
 export default function SignInPage() {
   return (
@@ -10,6 +11,7 @@ export default function SignInPage() {
         routing="hash"
         afterSignInUrl="/dashboard"
         appearance={{
+          baseTheme: dark,
           variables: {
             colorPrimary: "#BB0A21",
             colorBackground: "#0D0B1C",

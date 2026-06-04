@@ -485,7 +485,12 @@ export default function Apply() {
           }),
         });
 
-        if (!res.ok) throw new Error("Chat request failed");
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw new Error("AUTH_ERROR: session could not be verified");
+          }
+          throw new Error(`SERVER_ERROR: ${res.status}`);
+        }
 
         const data = (await res.json()) as {
           reply: string;
@@ -506,11 +511,15 @@ export default function Apply() {
         setCurrentField(data.currentField ?? "");
       } catch (err) {
         console.error("[chat] sendMessage failed:", err);
+        const message = (err as Error).message ?? "";
+        const userFacingText = message.startsWith("AUTH_ERROR:")
+          ? "Your session expired — please sign out and sign back in, then try again."
+          : "Something went wrong — please try again or contact startup@audi.de.";
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: "Something went wrong — please try again or contact startup@audi.de.",
+            content: userFacingText,
           },
         ]);
       } finally {

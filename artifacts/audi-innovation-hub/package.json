@@ -37,6 +37,7 @@
     "wouter": "^3.3.5"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.61.3"
+    "@clerk/clerk-react": "^5.61.3",
+    "@clerk/themes": "^2.4.57"
   }
 }

@@ -1,4 +1,5 @@
 import { SignUp } from "@clerk/clerk-react";
+import { dark } from "@clerk/themes";
 
 export default function SignUpPage() {
   return (
@@ -10,6 +11,7 @@ export default function SignUpPage() {
         routing="hash"
         afterSignUpUrl="/"
         appearance={{
+          baseTheme: dark,
           variables: {
             colorPrimary: "#BB0A21",
             colorBackground: "#0D0B1C",
